@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+pip-wheel-metadata/
+
+# macOS
+.DS_Store
+
+# SQLite DB
+fitness.db
+
+
+# Logs
+*.log
