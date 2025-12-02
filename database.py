@@ -14,15 +14,21 @@ class DatabaseManager:
     def create_tables(self) -> None:
         """Create required tables if they do not exist."""
         schema = """
-        CREATE TABLE IF NOT EXISTS user (
+        CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            gender TEXT,
             age REAL,
-            height REAL,
+            gender TEXT,
             weight REAL,
-            bmi REAL
+            height REAL,
+            bmi REAL,
+            fat_percentage REAL,
+            lean_mass_kg REAL,
+            experience_level TEXT,
+            workout_frequency REAL,
+            water_intake REAL,
+            resting_bpm REAL    
         );
-        CREATE TABLE IF NOT EXISTS workout (
+        CREATE TABLE IF NOT EXISTS workouts (
             workout_id INTEGER PRIMARY KEY,
             user_id INTEGER,
             workout_type TEXT,
@@ -31,27 +37,47 @@ class DatabaseManager:
             max_bpm REAL,
             avg_bpm REAL,
             resting_bpm REAL,
-            FOREIGN KEY (user_id) REFERENCES user(user_id)
+            name_of_exercise TEXT,
+            sets REAL,
+            reps REAL,
+            target_muscle_group TEXT,
+            equipment_needed TEXT,
+            difficulty_level TEXT,
+            body_part TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
         CREATE TABLE IF NOT EXISTS nutrition (
             nutrition_id INTEGER PRIMARY KEY,
             user_id INTEGER,
+            daily_meals_frequency REAL,
             carbs REAL,
             proteins REAL,
             fats REAL,
+            calories REAL,
+            meal_name TEXT,
+            meal_type TEXT,
+            diet_type TEXT,
             sugar_g REAL,
             sodium_mg REAL,
-            calories_intake REAL,
-            FOREIGN KEY (user_id) REFERENCES user(user_id)
+            cholesterol_mg REAL,
+            serving_size_g REAL,
+            cooking_method TEXT,
+            prep_time_min REAL,
+            cook_time_min REAL,
+            rating REAL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
-        CREATE TABLE IF NOT EXISTS derived_metrics (
-            metric_id INTEGER PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS workout_analysis (
+            analysis_id INTEGER PRIMARY KEY,
             user_id INTEGER,
-            fat_percentage REAL,
-            water_intake REAL,
-            lean_mass_kg REAL,
+            pct_hrr REAL,
+            pct_maxhr REAL,
             cal_balance REAL,
-            FOREIGN KEY (user_id) REFERENCES user(user_id)
+            expected_burn REAL,
+            benefit TEXT,
+            burns_calories_per_30min REAL,
+            type_of_muscle TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
         CREATE TABLE IF NOT EXISTS templates (
             template_id INTEGER PRIMARY KEY,
@@ -61,6 +87,38 @@ class DatabaseManager:
         """
         with self.conn:
             self.conn.executescript(schema)
+        
+        # 添加新增的分析指标字段
+        self._add_analysis_columns()
+
+    def _add_analysis_columns(self) -> None:
+        """为 workout_analysis 表添加分析指标字段"""
+        try:
+            with self.conn:
+                # 检查并添加 training_efficiency 列
+                self.conn.execute("""
+                    ALTER TABLE workout_analysis ADD COLUMN training_efficiency REAL
+                """)
+        except sqlite3.OperationalError:
+            pass  # 列已存在
+        
+        try:
+            with self.conn:
+                # 检查并添加 muscle_focus_score 列
+                self.conn.execute("""
+                    ALTER TABLE workout_analysis ADD COLUMN muscle_focus_score REAL
+                """)
+        except sqlite3.OperationalError:
+            pass  # 列已存在
+        
+        try:
+            with self.conn:
+                # 检查并添加 recovery_index 列
+                self.conn.execute("""
+                    ALTER TABLE workout_analysis ADD COLUMN recovery_index REAL
+                """)
+        except sqlite3.OperationalError:
+            pass  # 列已存在
 
     def execute(
         self,
