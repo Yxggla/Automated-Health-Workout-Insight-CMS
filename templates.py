@@ -1,13 +1,5 @@
 DEFAULT_TEMPLATES = [
     {
-        "name": "心率与恢复 / Heart & Recovery",
-        "old_name": "Heart Health Snapshot",
-        "text": (
-            "平均训练心率 {avg_bpm} bpm，峰值 {max_bpm} bpm，静息心率 {resting_bpm} bpm；结合 BMI {bmi}，心肺负荷与体重管理处于可控区间。\n"
-            "Average training HR {avg_bpm} bpm (peak {max_bpm}, resting {resting_bpm}); with BMI {bmi}, overall load stays manageable."
-        ),
-    },
-    {
         "name": "体重体成分 / Weight & Composition",
         "old_name": "Body Composition Overview",
         "text": (
@@ -15,22 +7,15 @@ DEFAULT_TEMPLATES = [
             "Avg weight {weight} kg, height {height} m, BMI {bmi}; body fat {fat_percentage}% and lean mass {lean_mass_kg} kg outline composition."
         ),
     },
-    # {
-    #     "name": "能量收支 / Energy Balance",
-    #     "old_name": "Caloric Deficit Leader",
-    #     "text": (
-    #         "当前热量平衡 {cal_balance} 千卡，日均摄入 {calories_intake} kcal，对比累计燃烧 {cal_burned} 千卡，收支方向清晰可见。\n"
-    #         "Calorie balance stands at {cal_balance} kcal; daily intake {calories_intake} kcal versus total burn {cal_burned} kcal shows the direction."
-    #     ),
-    # },
-    # {
-    #     "name": "主力训练输出 / Primary Session Output",
-    #     "old_name": "Calories by Popular Workout",
-    #     "text": (
-    #         "主力训练类型 {workout_type}，单次燃烧 {avg_calories} 千卡，耗时 {avg_duration} 小时；累计贡献 {cal_burned} 千卡，体现核心输出。\n"
-    #         "Primary workout {workout_type} burns {avg_calories} kcal over {avg_duration} hours per session, driving {cal_burned} kcal in total."
-    #     ),
-    # },
+    {
+        "name": "心率与恢复 / Heart & Recovery",
+        "old_name": "Heart Health Snapshot",
+        "text": (
+            "平均训练心率 {avg_bpm} bpm，峰值 {max_bpm} bpm，静息心率 {resting_bpm} bpm；结合 BMI {bmi}，心肺负荷与体重管理处于可控区间。\n"
+            "Average training HR {avg_bpm} bpm (peak {max_bpm}, resting {resting_bpm}); with BMI {bmi}, overall load stays manageable."
+        ),
+    },
+    
     {
         "name": "营养水化与餐食 / Nutrition & Meals",
         "old_name": "Macro Intake",

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>健身洞察 Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    function csrfToken() {
+      const hidden = document.getElementById('csrf-token');
+      if (hidden) return hidden.value;
+      const name = 'csrftoken';
+      const cookies = document.cookie.split(';');
+      for (const c of cookies) {
+        const [k, v] = c.trim().split('=');
+        if (k === name) return decodeURIComponent(v);
+      }
+      return '';
+    }
+    async function postForm(url, data) {
+      const form = new FormData();
+      Object.entries(data).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) form.append(k, v);
+      });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken() },
+        body: form
+      });
+      return res.json();
+    }
+    async function getJson(url) {
+      const res = await fetch(url);
+      return res.json();
+    }
+    async function handleImport() {
+      const fileInput = document.getElementById('csvFile');
+      const status = document.getElementById('status');
+      status.textContent = '导入中...';
+      const data = fileInput.files.length ? { file: fileInput.files[0] } : {};
+      const result = await postForm('/api/import', data);
+      status.textContent = result.ok ? `导入完成：${result.rows} 行` : `导入失败：${result.error}`;
+      if (result.ok) {
+        await refreshUsers();
+        await refreshTemplates();
+      }
+    }
+    async function handleSeed() {
+      const status = document.getElementById('status');
+      status.textContent = '刷新模板...';
+      const result = await postForm('/api/seed', {});
+      status.textContent = result.ok ? '模板已刷新' : `失败：${result.error}`;
+      if (result.ok) await refreshTemplates();
+    }
+    async function renderTemplate(id) {
+      const fmt = "text";
+      const userSelect = document.getElementById('userSelect');
+      const userVal = userSelect.value || '';
+      const status = document.getElementById('status');
+      status.textContent = '渲染中...';
+      const result = await postForm('/api/render', { template_id: id, format: fmt, user_id: userVal });
+      if (result.ok) {
+        document.getElementById('output').innerHTML = result.content;
+        status.textContent = '完成';
+      } else {
+        status.textContent = `渲染失败：${result.error}`;
+      }
+    }
+    async function loadSummary() {
+      const res = await getJson('/api/summary');
+      if (!res.ok) {
+        document.getElementById('summary').textContent = `汇总失败：${res.error}`;
+        return;
+      }
+      const s = res.summary;
+      const parts = [];
+      if (s.calories_by_workout) {
+        parts.push('<h3 class="font-semibold mt-2">按训练类型燃烧</h3><ul class="list-disc ml-5">');
+        s.calories_by_workout.forEach(r => {
+          parts.push(`<li>${r.workout_type}: ${r.avg_calories} kcal, ${r.avg_duration} hrs, ${r.sessions} sessions</li>`);
+        });
+        parts.push('</ul>');
+      }
+      if (s.top_deficit) {
+        parts.push('<h3 class="font-semibold mt-2">热量赤字 Top5</h3><ul class="list-disc ml-5">');
+        s.top_deficit.forEach(r => {
+          parts.push(`<li>User ${r.user_id} (${r.gender}, ${r.age}y): ${r.cal_balance} kcal, ${r.session_duration} hrs</li>`);
+        });
+        parts.push('</ul>');
+      }
+      if (s.macro_averages) {
+        parts.push('<h3 class="font-semibold mt-2">宏量平均</h3>');
+        parts.push(`<p>碳水 ${s.macro_averages.carbs} g | 蛋白 ${s.macro_averages.proteins} g | 脂肪 ${s.macro_averages.fats} g | 热量 ${s.macro_averages.calories} kcal</p>`);
+      }
+      if (s.efficiency) {
+        parts.push('<h3 class="font-semibold mt-2">训练效率</h3><ul class="list-disc ml-5">');
+        s.efficiency.forEach(r => {
+          parts.push(`<li>${r.workout_type}: 效率 ${r.avg_efficiency} | 专注 ${r.avg_focus} | 恢复 ${r.avg_recovery}</li>`);
+        });
+        parts.push('</ul>');
+      }
+      document.getElementById('summary').innerHTML = parts.join('');
+    }
+    async function refreshTemplates() {
+      const res = await getJson('/api/templates');
+      if (!res.ok) return;
+      const container = document.getElementById('templates');
+      container.innerHTML = '';
+      res.templates.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left px-3 py-2 rounded bg-slate-100 hover:bg-slate-200 mb-2';
+        btn.textContent = `[${t.id}] ${t.name}`;
+        btn.onclick = () => renderTemplate(t.id);
+        container.appendChild(btn);
+      });
+    }
+    async function refreshUsers() {
+      const res = await getJson('/api/users');
+      if (!res.ok) return;
+      const sel = document.getElementById('userSelect');
+      sel.innerHTML = '<option value="">所有用户（平均）</option>';
+      res.users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.textContent = `用户 ${u}`;
+        sel.appendChild(opt);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshTemplates();
+      refreshUsers();
+      loadSummary();
+    });
+  </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+  <input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+  <div class="max-w-6xl mx-auto p-6 space-y-4">
+    <header class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">健身洞察 Web</h1>
+      </div>
+      <span id="status" class="text-sm text-slate-600">就绪</span>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <aside class="lg:col-span-1 space-y-3">
+        <div class="p-4 bg-white rounded border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold">模板管理</h2>
+            <button onclick="handleSeed()" class="px-3 py-1 text-xs bg-slate-800 text-white rounded">刷新</button>
+          </div>
+          <div>
+            <label class="text-sm text-slate-700">用户筛选</label>
+            <select id="userSelect" class="w-full border rounded px-2 py-1 text-sm"></select>
+          </div>
+        </div>
+
+        <div class="p-4 bg-white rounded border border-slate-200 h-[520px] overflow-auto">
+          <h2 class="font-semibold mb-2">模板列表</h2>
+          <div id="templates" class="space-y-2"></div>
+        </div>
+      </aside>
+
+      <main class="lg:col-span-2 space-y-3">
+        <div class="p-4 bg-white rounded border border-slate-200 min-h-[240px]">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold">输出（Text）</h2>
+            <span class="text-xs text-slate-500">点击左侧模板</span>
+          </div>
+          <div id="output" class="prose max-w-none whitespace-pre-wrap text-sm text-slate-800"></div>
+        </div>
+        <div class="p-4 bg-white rounded border border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold">汇总</h2>
+            <button onclick="loadSummary()" class="px-3 py-1 text-xs bg-slate-800 text-white rounded">刷新</button>
+          </div>
+          <div id="summary" class="text-sm mt-2 space-y-2"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

@@ -1,75 +1,51 @@
-# Automated Health & Workout Insight CMS
+# 健身洞察 Web（Django + SQLite）
 
-Python + SQLite project that ingests the Kaggle **Smart Fitness & Nutrition Analytics Dataset** (`Final_data.csv`) and generates daily fitness/nutrition insights via templates.
+基于 Kaggle “Smart Fitness & Nutrition Analytics” 数据集的洞察系统。前端：Django + Tailwind；功能：模板渲染（文本输出）、用户筛选、汇总查看。业务库：`fitness.db`；Django 系统库：`db.sqlite3`（两者分离）。
 
-## Requirements
-- Python 3.9+
-- `pandas` (built-in `sqlite3` is used; no other deps)
-
-## Files
-- `main.py` — CLI entrypoint (menu).
-- `gui.py` — Tkinter GUI with template buttons and report display.
-- `database.py` — schema and SQLite helper.
-- `importer.py` — CSV importer -> normalized tables.
-- `renderer.py` — template rendering (text/markdown/html).
-- `templates.py` — default insight templates.
-
-## Quickstart
-1. Place the dataset CSV at `Final_data.csv` in this folder (or keep your existing `Final_data (1).csv`).
-2. Install pandas if needed:
+## 快速启动（全新环境）
+1) 准备环境
    ```bash
-   pip install pandas
-   ```
-3a. Run the CLI:
-   ```bash
-   python main.py
-   ```
-3b. Run the GUI:
-   ```bash
-   python gui.py
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 
-## 运行环境说明（含可能情况）
-- **推荐使用虚拟环境**：
-  ```bash
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  ```
-- **Tk 依赖（GUI 需要，CLI 不需要）**：
-  - 官方 Python 安装包通常自带 Tk，直接建 venv 即可。
-  - Homebrew 环境下需安装并暴露 Tcl/Tk：
-    ```bash
-    brew install tcl-tk python-tk@3.12
-    export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"
-    export LDFLAGS="-L/opt/homebrew/opt/tcl-tk/lib"
-    export CPPFLAGS="-I/opt/homebrew/opt/tcl-tk/include"
-    ```
-    然后再创建/激活 venv。
-  - 检查 Tk 是否可用：`python3.12 -m tkinter`（弹出小窗口即正常）。
-- **如果只想用 CLI**：不装 Tk 也能运行 `python main.py`，GUI 则需要 Tk。
-- **每次新终端**：如果用 Homebrew+Tk，上面导出的 `PATH/CPPFLAGS/LDFLAGS` 需重新执行，或写入 shell 配置文件。
-- **依赖列表**：`requirements.txt` 仅包含 `pandas`，其余为标准库。
+2) 清理并创建数据库
+   ```bash
+   rm -f fitness.db db.sqlite3
+   python manage.py migrate             # 仅在 db.sqlite3 中创建 Django 系统表
+   ```
 
-## Menu Actions
-1) **Import dataset into SQLite**  
-   - Accepts a path prompt; defaults to `Final_data.csv` (auto-detects `Final_data (1).csv`).
-2) **List templates**  
-   - Shows seeded template IDs and names.
-3) **Generate a report**  
-   - Enter `template_id` and choose format: `text`, `markdown`, or `html`.
-4) **Show SQL analytical summary**  
-   - Prints aggregate stats (calories by workout type, top caloric deficit, macro averages).
-5) **Exit**
+3) 导入业务数据到 fitness.db（确保 CSV 在根目录，如 Final_data (1).csv）
+   ```bash
+   python - <<'PY'
+   from database import DatabaseManager
+   from templates import seed_templates
+   from importer import DataImporter
+   db = DatabaseManager("fitness.db"); db.create_tables()
+   seed_templates(db)
+   DataImporter(db).import_csv("Final_data (1).csv", clear_existing=True)  # 或 Final_data.csv
+   print("users rows:", db.execute("SELECT COUNT(*) AS c FROM users", fetchone=True)["c"])
+   db.close()
+   PY
+   ```
 
-## Output Notes
-- Reports fill placeholders (e.g., `{avg_bpm}`, `{cal_balance}`, `{workout_type}`) via SQL aggregates, joins, and subqueries.
-- HTML/Markdown options are simple wrappers; extend in `renderer.py` if you want richer styling.
+4) 启动 Web 前端
+   ```bash
+   python manage.py runserver  # 默认 http://127.0.0.1:8000
+   ```
+   - 左侧：刷新模板、用户筛选、模板列表（点击即渲染）
+   - 右侧：文本输出、汇总（可刷新）
 
-## GUI Notes
-- Buttons for each template (renders to the right panel).
-- Output format selector (text/markdown/html).
-- “Import Dataset” button opens a file picker; “Show Summary” prints aggregate stats to the panel.
+## 主要文件
+- fitness_site/settings.py：Django 配置（系统库 db.sqlite3）
+- insights/views.py / insights/urls.py：接口与路由（使用 fitness.db）
+- templates/insights/index.html：前端界面（Tailwind CDN）
+- database.py：业务 SQLite schema/连接
+- importer.py：CSV 导入到业务表
+- renderer.py：模板渲染（占位符 → SQL）
+- templates.py：默认模板及 seed
 
-## Resetting Data
-- Re-running “Import dataset” clears and reloads the `user`, `workout`, `nutrition`, and `derived_metrics` tables.
+## 备注
+- 旧的 CLI/GUI 文件仍在，但当前推荐使用 Web 前端。
+- 重置模板可在页面点击“刷新模板”或在代码中调用 `seed_templates(db)`。
