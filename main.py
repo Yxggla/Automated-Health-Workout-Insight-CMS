@@ -6,6 +6,7 @@ from database import DatabaseManager
 from importer import DataImporter
 from renderer import TemplateRenderer
 from templates import seed_templates
+from user_manager import UserManager
 
 
 def detect_csv_path() -> Optional[str]:
@@ -141,6 +142,253 @@ def show_summary(db: DatabaseManager) -> None:
     print("\n-------------------------------\n")
 
 
+def list_users(db: DatabaseManager) -> None:
+    """列出所有用户"""
+    manager = UserManager(db)
+    users = manager.list_users(limit=50)
+    
+    if not users:
+        print("No users found.")
+        return
+    
+    print(f"\n--- Users ({len(users)} found) ---")
+    print(f"{'ID':<6} {'Age':<6} {'Gender':<8} {'Weight':<8} {'Height':<8} {'BMI':<6} {'Experience':<12}")
+    print("-" * 70)
+    for user in users:
+        print(
+            f"{user['user_id']:<6} "
+            f"{user['age'] or 'N/A':<6} "
+            f"{user['gender'] or 'N/A':<8} "
+            f"{user['weight'] or 'N/A':<8} "
+            f"{user['height'] or 'N/A':<8} "
+            f"{user['bmi'] or 'N/A':<6} "
+            f"{user['experience_level'] or 'N/A':<12}"
+        )
+    print()
+
+
+def view_user(db: DatabaseManager) -> None:
+    """查看单个用户详细信息"""
+    try:
+        user_id = int(input("Enter user_id to view: ").strip())
+    except ValueError:
+        print("Invalid user id.")
+        return
+    
+    manager = UserManager(db)
+    user = manager.get_user(user_id)
+    
+    if not user:
+        print(f"User {user_id} not found.")
+        return
+    
+    print(f"\n--- User {user_id} Details ---")
+    for key, value in user.items():
+        print(f"{key}: {value}")
+    
+    # 显示统计信息
+    stats = manager.get_user_statistics(user_id)
+    if stats:
+        print("\n--- Statistics ---")
+        if stats.get("workout_stats"):
+            print("Workout Stats:")
+            for k, v in stats["workout_stats"].items():
+                print(f"  {k}: {v}")
+        if stats.get("nutrition_stats"):
+            print("Nutrition Stats:")
+            for k, v in stats["nutrition_stats"].items():
+                print(f"  {k}: {v}")
+        if stats.get("analysis_stats"):
+            print("Analysis Stats:")
+            for k, v in stats["analysis_stats"].items():
+                print(f"  {k}: {v}")
+    print()
+
+
+def create_user(db: DatabaseManager) -> None:
+    """创建新用户"""
+    manager = UserManager(db)
+    
+    print("\n--- Create New User ---")
+    print("Enter user information (press Enter to skip optional fields):")
+    
+    try:
+        age = input("Age: ").strip()
+        age = float(age) if age else None
+        
+        gender = input("Gender (M/F/Other): ").strip() or None
+        
+        weight = input("Weight (kg): ").strip()
+        weight = float(weight) if weight else None
+        
+        height = input("Height (cm): ").strip()
+        height = float(height) if height else None
+        
+        fat_percentage = input("Fat Percentage: ").strip()
+        fat_percentage = float(fat_percentage) if fat_percentage else None
+        
+        lean_mass_kg = input("Lean Mass (kg): ").strip()
+        lean_mass_kg = float(lean_mass_kg) if lean_mass_kg else None
+        
+        experience_level = input("Experience Level (Beginner/Intermediate/Advanced): ").strip() or None
+        
+        workout_frequency = input("Workout Frequency (per week): ").strip()
+        workout_frequency = float(workout_frequency) if workout_frequency else None
+        
+        water_intake = input("Water Intake (L): ").strip()
+        water_intake = float(water_intake) if water_intake else None
+        
+        resting_bpm = input("Resting BPM: ").strip()
+        resting_bpm = float(resting_bpm) if resting_bpm else None
+        
+        user_id = manager.create_user(
+            age=age,
+            gender=gender,
+            weight=weight,
+            height=height,
+            fat_percentage=fat_percentage,
+            lean_mass_kg=lean_mass_kg,
+            experience_level=experience_level,
+            workout_frequency=workout_frequency,
+            water_intake=water_intake,
+            resting_bpm=resting_bpm,
+        )
+        print(f"User created successfully with ID: {user_id}")
+    except ValueError as e:
+        print(f"Invalid input: {e}")
+    except Exception as e:
+        print(f"Failed to create user: {e}")
+
+
+def update_user(db: DatabaseManager) -> None:
+    """更新用户信息"""
+    try:
+        user_id = int(input("Enter user_id to update: ").strip())
+    except ValueError:
+        print("Invalid user id.")
+        return
+    
+    manager = UserManager(db)
+    
+    if not manager.get_user(user_id):
+        print(f"User {user_id} not found.")
+        return
+    
+    print(f"\n--- Update User {user_id} ---")
+    print("Enter new values (press Enter to skip):")
+    
+    try:
+        age = input("Age: ").strip()
+        age = float(age) if age else None
+        
+        gender = input("Gender (M/F/Other): ").strip() or None
+        
+        weight = input("Weight (kg): ").strip()
+        weight = float(weight) if weight else None
+        
+        height = input("Height (cm): ").strip()
+        height = float(height) if height else None
+        
+        fat_percentage = input("Fat Percentage: ").strip()
+        fat_percentage = float(fat_percentage) if fat_percentage else None
+        
+        lean_mass_kg = input("Lean Mass (kg): ").strip()
+        lean_mass_kg = float(lean_mass_kg) if lean_mass_kg else None
+        
+        experience_level = input("Experience Level: ").strip() or None
+        
+        workout_frequency = input("Workout Frequency: ").strip()
+        workout_frequency = float(workout_frequency) if workout_frequency else None
+        
+        water_intake = input("Water Intake (L): ").strip()
+        water_intake = float(water_intake) if water_intake else None
+        
+        resting_bpm = input("Resting BPM: ").strip()
+        resting_bpm = float(resting_bpm) if resting_bpm else None
+        
+        success = manager.update_user(
+            user_id=user_id,
+            age=age,
+            gender=gender,
+            weight=weight,
+            height=height,
+            fat_percentage=fat_percentage,
+            lean_mass_kg=lean_mass_kg,
+            experience_level=experience_level,
+            workout_frequency=workout_frequency,
+            water_intake=water_intake,
+            resting_bpm=resting_bpm,
+        )
+        
+        if success:
+            print(f"User {user_id} updated successfully.")
+        else:
+            print(f"Failed to update user {user_id}.")
+    except ValueError as e:
+        print(f"Invalid input: {e}")
+    except Exception as e:
+        print(f"Failed to update user: {e}")
+
+
+def delete_user(db: DatabaseManager) -> None:
+    """删除用户"""
+    try:
+        user_id = int(input("Enter user_id to delete: ").strip())
+    except ValueError:
+        print("Invalid user id.")
+        return
+    
+    manager = UserManager(db)
+    
+    if not manager.get_user(user_id):
+        print(f"User {user_id} not found.")
+        return
+    
+    cascade = input("Delete associated data (workouts, nutrition, etc.)? (y/N): ").strip().lower() == "y"
+    
+    confirm = input(f"Are you sure you want to delete user {user_id}? (yes/no): ").strip().lower()
+    if confirm != "yes":
+        print("Deletion cancelled.")
+        return
+    
+    success = manager.delete_user(user_id, cascade=cascade)
+    if success:
+        print(f"User {user_id} deleted successfully.")
+    else:
+        print(f"Failed to delete user {user_id}.")
+
+
+def user_management_menu(db: DatabaseManager) -> None:
+    """用户管理子菜单"""
+    menu = """
+User Management
+1. List all users
+2. View user details
+3. Create new user
+4. Update user
+5. Delete user
+6. Back to main menu
+Choose an option: """
+    
+    actions = {
+        "1": list_users,
+        "2": view_user,
+        "3": create_user,
+        "4": update_user,
+        "5": delete_user,
+    }
+    
+    while True:
+        choice = input(menu).strip()
+        if choice == "6":
+            break
+        action = actions.get(choice)
+        if not action:
+            print("Invalid choice. Try again.")
+            continue
+        action(db)
+
+
 def main() -> None:
     db = DatabaseManager()
     db.create_tables()
@@ -152,7 +400,8 @@ Automated Health & Workout Insight CMS
 2. List templates
 3. Generate a report using template_id
 4. Show SQL analytical summary
-5. Exit
+5. User Management
+6. Exit
 Choose an option: """
 
     actions = {
@@ -160,12 +409,13 @@ Choose an option: """
         "2": list_templates,
         "3": generate_report,
         "4": show_summary,
+        "5": user_management_menu,
     }
 
     try:
         while True:
             choice = input(menu).strip()
-            if choice == "5":
+            if choice == "6":
                 print("Goodbye.")
                 break
             action = actions.get(choice)

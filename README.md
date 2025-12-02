@@ -45,7 +45,54 @@
 - importer.py：CSV 导入到业务表
 - renderer.py：模板渲染（占位符 → SQL）
 - templates.py：默认模板及 seed
+- user_manager.py：用户管理模块（CRUD 操作）
+
+## 用户管理功能
+
+### 命令行界面（main.py）
+运行 `python main.py`，选择菜单选项 5 进入用户管理：
+- 列出所有用户
+- 查看用户详情（包括统计信息）
+- 创建新用户
+- 更新用户信息
+- 删除用户（支持级联删除关联数据）
+
+### GUI 界面（gui.py）
+运行 `python gui.py`，点击"用户管理"按钮：
+- 可视化用户列表（表格形式）
+- 实时查看用户详情和统计信息
+- 通过对话框创建/更新用户
+- 删除用户（带确认提示）
+
+### 编程接口（user_manager.py）
+```python
+from database import DatabaseManager
+from user_manager import UserManager
+
+db = DatabaseManager()
+manager = UserManager(db)
+
+# 创建用户
+user_id = manager.create_user(
+    age=25, gender="M", weight=70, height=175,
+    experience_level="Intermediate"
+)
+
+# 查询用户
+user = manager.get_user(user_id)
+users = manager.list_users(limit=10)
+
+# 更新用户
+manager.update_user(user_id, weight=72, workout_frequency=4)
+
+# 删除用户
+manager.delete_user(user_id, cascade=True)  # cascade=True 会删除关联数据
+
+# 获取用户统计信息
+stats = manager.get_user_statistics(user_id)
+```
 
 ## 备注
 - 旧的 CLI/GUI 文件仍在，但当前推荐使用 Web 前端。
-- 重置模板可在页面点击“刷新模板”或在代码中调用 `seed_templates(db)`。
+- 重置模板可在页面点击"刷新模板"或在代码中调用 `seed_templates(db)`。
+- 用户管理功能已集成到 CLI 和 GUI 界面中，可直接使用。

@@ -127,6 +127,185 @@
         sel.appendChild(opt);
       });
     }
+    
+    // 用户管理相关函数
+    let currentEditingUserId = null;
+    
+    async function loadUserManagement() {
+      const res = await getJson('/api/users/detail?limit=100');
+      if (!res.ok) {
+        document.getElementById('userManagementStatus').textContent = `加载失败：${res.error}`;
+        return;
+      }
+      
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '';
+      
+      res.users.forEach(user => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50 cursor-pointer';
+        row.onclick = () => viewUserDetail(user.user_id);
+        row.innerHTML = `
+          <td class="px-4 py-2">${user.user_id}</td>
+          <td class="px-4 py-2">${user.age || 'N/A'}</td>
+          <td class="px-4 py-2">${user.gender || 'N/A'}</td>
+          <td class="px-4 py-2">${user.weight || 'N/A'}</td>
+          <td class="px-4 py-2">${user.height || 'N/A'}</td>
+          <td class="px-4 py-2">${user.bmi ? user.bmi.toFixed(2) : 'N/A'}</td>
+          <td class="px-4 py-2">${user.experience_level || 'N/A'}</td>
+          <td class="px-4 py-2">
+            <button onclick="event.stopPropagation(); editUser(${user.user_id})" 
+                    class="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">编辑</button>
+            <button onclick="event.stopPropagation(); deleteUserConfirm(${user.user_id})" 
+                    class="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-1">删除</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      document.getElementById('userManagementStatus').textContent = `共 ${res.total} 个用户`;
+    }
+    
+    async function viewUserDetail(userId) {
+      const res = await getJson(`/api/users/get?user_id=${userId}`);
+      if (!res.ok) {
+        alert(`加载失败：${res.error}`);
+        return;
+      }
+      
+      const user = res.user;
+      const stats = res.statistics || {};
+      
+      let html = `<div class="space-y-2"><h3 class="font-semibold text-lg">用户 ${userId} 详情</h3>`;
+      html += '<div class="grid grid-cols-2 gap-2 text-sm">';
+      
+      for (const [key, value] of Object.entries(user)) {
+        if (key !== 'user_id') {
+          html += `<div><span class="font-medium">${key}:</span> ${value !== null && value !== undefined ? value : 'N/A'}</div>`;
+        }
+      }
+      html += '</div>';
+      
+      if (stats.workout_stats && Object.keys(stats.workout_stats).length > 0) {
+        html += '<h4 class="font-semibold mt-4">训练统计</h4><ul class="list-disc ml-5 text-sm">';
+        for (const [key, value] of Object.entries(stats.workout_stats)) {
+          html += `<li>${key}: ${value}</li>`;
+        }
+        html += '</ul>';
+      }
+      
+      if (stats.nutrition_stats && Object.keys(stats.nutrition_stats).length > 0) {
+        html += '<h4 class="font-semibold mt-4">营养统计</h4><ul class="list-disc ml-5 text-sm">';
+        for (const [key, value] of Object.entries(stats.nutrition_stats)) {
+          html += `<li>${key}: ${value}</li>`;
+        }
+        html += '</ul>';
+      }
+      
+      if (stats.analysis_stats && Object.keys(stats.analysis_stats).length > 0) {
+        html += '<h4 class="font-semibold mt-4">分析统计</h4><ul class="list-disc ml-5 text-sm">';
+        for (const [key, value] of Object.entries(stats.analysis_stats)) {
+          html += `<li>${key}: ${value}</li>`;
+        }
+        html += '</ul>';
+      }
+      
+      html += '</div>';
+      document.getElementById('userDetailContent').innerHTML = html;
+    }
+    
+    function openUserForm(userId = null) {
+      currentEditingUserId = userId;
+      const modal = document.getElementById('userFormModal');
+      const form = document.getElementById('userForm');
+      
+      if (userId) {
+        // 编辑模式：加载用户数据
+        getJson(`/api/users/get?user_id=${userId}`).then(res => {
+          if (res.ok && res.user) {
+            Object.keys(res.user).forEach(key => {
+              const input = form.querySelector(`[name="${key}"]`);
+              if (input && res.user[key] !== null) {
+                input.value = res.user[key];
+              }
+            });
+            document.getElementById('userFormTitle').textContent = '编辑用户';
+          }
+        });
+      } else {
+        // 创建模式：清空表单
+        form.reset();
+        document.getElementById('userFormTitle').textContent = '创建新用户';
+      }
+      
+      modal.classList.remove('hidden');
+    }
+    
+    function closeUserForm() {
+      document.getElementById('userFormModal').classList.add('hidden');
+      currentEditingUserId = null;
+    }
+    
+    async function submitUserForm() {
+      const form = document.getElementById('userForm');
+      const formData = new FormData(form);
+      
+      if (currentEditingUserId) {
+        formData.append('user_id', currentEditingUserId);
+        const res = await postForm('/api/users/update', formData);
+        if (res.ok) {
+          alert('用户更新成功！');
+          closeUserForm();
+          loadUserManagement();
+          refreshUsers();
+        } else {
+          alert(`更新失败：${res.error}`);
+        }
+      } else {
+        const res = await postForm('/api/users/create', formData);
+        if (res.ok) {
+          alert(`用户创建成功！ID: ${res.user_id}`);
+          closeUserForm();
+          loadUserManagement();
+          refreshUsers();
+        } else {
+          alert(`创建失败：${res.error}`);
+        }
+      }
+    }
+    
+    function editUser(userId) {
+      openUserForm(userId);
+    }
+    
+    function deleteUserConfirm(userId) {
+      if (!confirm(`确定要删除用户 ${userId} 吗？`)) return;
+      
+      const cascade = confirm('是否同时删除关联数据（训练、营养等）？');
+      const formData = new FormData();
+      formData.append('user_id', userId);
+      formData.append('cascade', cascade);
+      
+      postForm('/api/users/delete', formData).then(res => {
+        if (res.ok) {
+          alert('用户删除成功！');
+          loadUserManagement();
+          refreshUsers();
+        } else {
+          alert(`删除失败：${res.error}`);
+        }
+      });
+    }
+    
+    function openUserManagement() {
+      document.getElementById('userManagementModal').classList.remove('hidden');
+      loadUserManagement();
+    }
+    
+    function closeUserManagement() {
+      document.getElementById('userManagementModal').classList.add('hidden');
+    }
+    
     document.addEventListener('DOMContentLoaded', () => {
       refreshTemplates();
       refreshUsers();
@@ -142,7 +321,12 @@
       <div>
         <h1 class="text-2xl font-bold">健身洞察 Web</h1>
       </div>
-      <span id="status" class="text-sm text-slate-600">就绪</span>
+      <div class="flex items-center gap-4">
+        <button onclick="openUserManagement()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          用户管理
+        </button>
+        <span id="status" class="text-sm text-slate-600">就绪</span>
+      </div>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -180,6 +364,101 @@
           <div id="summary" class="text-sm mt-2 space-y-2"></div>
         </div>
       </main>
+    </div>
+  </div>
+
+  <!-- 用户管理模态框 -->
+  <div id="userManagementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-4 border-b flex items-center justify-between">
+        <h2 class="text-xl font-bold">用户管理</h2>
+        <div class="flex items-center gap-4">
+          <span id="userManagementStatus" class="text-sm text-slate-600"></span>
+          <button onclick="openUserForm()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">创建用户</button>
+          <button onclick="closeUserManagement()" class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700">关闭</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-hidden flex">
+        <div class="flex-1 overflow-auto p-4">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr class="bg-slate-100">
+                <th class="px-4 py-2 text-left border">ID</th>
+                <th class="px-4 py-2 text-left border">年龄</th>
+                <th class="px-4 py-2 text-left border">性别</th>
+                <th class="px-4 py-2 text-left border">体重(kg)</th>
+                <th class="px-4 py-2 text-left border">身高(cm)</th>
+                <th class="px-4 py-2 text-left border">BMI</th>
+                <th class="px-4 py-2 text-left border">经验等级</th>
+                <th class="px-4 py-2 text-left border">操作</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody"></tbody>
+          </table>
+        </div>
+        <div class="w-80 border-l p-4 overflow-auto">
+          <h3 class="font-semibold mb-2">用户详情</h3>
+          <div id="userDetailContent" class="text-sm">点击用户行查看详情</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户表单模态框 -->
+  <div id="userFormModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
+      <div class="p-4 border-b flex items-center justify-between">
+        <h2 id="userFormTitle" class="text-xl font-bold">创建新用户</h2>
+        <button onclick="closeUserForm()" class="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700">关闭</button>
+      </div>
+      <form id="userForm" class="p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">年龄 (Age)</label>
+            <input type="number" name="age" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">性别 (Gender)</label>
+            <input type="text" name="gender" placeholder="M/F/Other" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">体重 (Weight, kg)</label>
+            <input type="number" name="weight" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">身高 (Height, cm)</label>
+            <input type="number" name="height" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">体脂率 (Fat %)</label>
+            <input type="number" name="fat_percentage" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">瘦体重 (Lean Mass, kg)</label>
+            <input type="number" name="lean_mass_kg" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">经验等级 (Experience)</label>
+            <input type="text" name="experience_level" placeholder="Beginner/Intermediate/Advanced" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">训练频率 (Workout Frequency/week)</label>
+            <input type="number" name="workout_frequency" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">饮水量 (Water Intake, L)</label>
+            <input type="number" name="water_intake" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">静息心率 (Resting BPM)</label>
+            <input type="number" name="resting_bpm" step="0.1" class="w-full border rounded px-3 py-2">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-4 border-t">
+          <button type="button" onclick="closeUserForm()" class="px-4 py-2 bg-slate-400 text-white rounded hover:bg-slate-500">取消</button>
+          <button type="button" onclick="submitUserForm()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+        </div>
+      </form>
     </div>
   </div>
 </body>

@@ -7,6 +7,7 @@ from database import DatabaseManager
 from importer import DataImporter
 from renderer import TemplateRenderer
 from templates import seed_templates
+from user_manager import UserManager
 
 
 def detect_csv_path() -> Optional[str]:
@@ -48,6 +49,9 @@ class InsightGUI:
 
         summary_btn = tk.Button(control_frame, text="查看汇总 / Show Summary", command=self.show_summary)
         summary_btn.pack(side=tk.LEFT, padx=5)
+
+        user_mgmt_btn = tk.Button(control_frame, text="用户管理 / User Management", command=self.open_user_management)
+        user_mgmt_btn.pack(side=tk.LEFT, padx=5)
 
         # 新增：刷新模板按钮
         refresh_btn = tk.Button(control_frame, text="刷新模板 / Refresh Templates", command=self._load_template_buttons)
@@ -273,8 +277,298 @@ class InsightGUI:
         self.output.delete("1.0", tk.END)
         self.output.insert(tk.END, text)
 
+    def open_user_management(self) -> None:
+        """打开用户管理窗口"""
+        UserManagementWindow(self.db, self)
+
     def run(self) -> None:
         self.root.mainloop()
+
+
+class UserManagementWindow:
+    """用户管理窗口"""
+
+    def __init__(self, db: DatabaseManager, parent: InsightGUI) -> None:
+        self.db = db
+        self.parent = parent
+        self.manager = UserManager(db)
+
+        self.window = tk.Toplevel(parent.root)
+        self.window.title("用户管理 / User Management")
+        self.window.geometry("900x600")
+
+        self._build_layout()
+        self._refresh_user_list()
+
+    def _build_layout(self) -> None:
+        # 顶部按钮区域
+        button_frame = tk.Frame(self.window)
+        button_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+
+        tk.Button(button_frame, text="刷新列表 / Refresh", command=self._refresh_user_list).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="创建用户 / Create User", command=self._create_user).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="查看详情 / View Details", command=self._view_user).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="更新用户 / Update User", command=self._update_user).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="删除用户 / Delete User", command=self._delete_user).pack(side=tk.LEFT, padx=5)
+
+        # 用户列表区域
+        list_frame = tk.Frame(self.window)
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        tk.Label(list_frame, text="用户列表 / User List", font=("Arial", 12, "bold")).pack(anchor="w")
+
+        # 创建 Treeview 显示用户列表
+        columns = ("ID", "Age", "Gender", "Weight", "Height", "BMI", "Experience")
+        self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=20)
+        
+        for col in columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=100)
+
+        scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 详情显示区域
+        detail_frame = tk.LabelFrame(self.window, text="用户详情 / User Details")
+        detail_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.detail_text = scrolledtext.ScrolledText(detail_frame, wrap=tk.WORD, width=40, height=25)
+        self.detail_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # 绑定选择事件
+        self.tree.bind("<<TreeviewSelect>>", self._on_user_select)
+
+    def _refresh_user_list(self) -> None:
+        """刷新用户列表"""
+        # 清空现有数据
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        # 加载用户数据
+        users = self.manager.list_users(limit=100)
+        for user in users:
+            self.tree.insert(
+                "",
+                tk.END,
+                values=(
+                    user["user_id"],
+                    user["age"] or "N/A",
+                    user["gender"] or "N/A",
+                    user["weight"] or "N/A",
+                    user["height"] or "N/A",
+                    user["bmi"] or "N/A",
+                    user["experience_level"] or "N/A",
+                ),
+            )
+
+    def _on_user_select(self, event) -> None:
+        """当选择用户时显示详情"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+
+        item = self.tree.item(selection[0])
+        user_id = item["values"][0]
+
+        user = self.manager.get_user(user_id)
+        if not user:
+            return
+
+        # 显示用户详情
+        detail_lines = [f"用户 ID / User ID: {user_id}\n"]
+        detail_lines.append("-" * 40)
+        for key, value in user.items():
+            if key != "user_id":
+                detail_lines.append(f"{key}: {value or 'N/A'}")
+
+        # 显示统计信息
+        stats = self.manager.get_user_statistics(user_id)
+        if stats:
+            detail_lines.append("\n--- 统计信息 / Statistics ---")
+            if stats.get("workout_stats"):
+                detail_lines.append("\n训练统计 / Workout Stats:")
+                for k, v in stats["workout_stats"].items():
+                    detail_lines.append(f"  {k}: {v}")
+            if stats.get("nutrition_stats"):
+                detail_lines.append("\n营养统计 / Nutrition Stats:")
+                for k, v in stats["nutrition_stats"].items():
+                    detail_lines.append(f"  {k}: {v}")
+            if stats.get("analysis_stats"):
+                detail_lines.append("\n分析统计 / Analysis Stats:")
+                for k, v in stats["analysis_stats"].items():
+                    detail_lines.append(f"  {k}: {v}")
+
+        self.detail_text.delete("1.0", tk.END)
+        self.detail_text.insert(tk.END, "\n".join(detail_lines))
+
+    def _create_user(self) -> None:
+        """创建新用户对话框"""
+        dialog = UserFormDialog(self.window, "创建用户 / Create User")
+        if dialog.result:
+            try:
+                user_id = self.manager.create_user(**dialog.result)
+                messagebox.showinfo("成功 / Success", f"用户创建成功！ID: {user_id}\nUser created successfully! ID: {user_id}")
+                self._refresh_user_list()
+                if hasattr(self.parent, "_load_user_list"):
+                    self.parent._load_user_list()
+            except Exception as e:
+                messagebox.showerror("错误 / Error", f"创建失败: {e}\nFailed to create: {e}")
+
+    def _view_user(self) -> None:
+        """查看用户详情"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("警告 / Warning", "请先选择一个用户 / Please select a user first")
+            return
+
+        item = self.tree.item(selection[0])
+        user_id = item["values"][0]
+        self._on_user_select(None)
+
+    def _update_user(self) -> None:
+        """更新用户信息"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("警告 / Warning", "请先选择一个用户 / Please select a user first")
+            return
+
+        item = self.tree.item(selection[0])
+        user_id = item["values"][0]
+
+        user = self.manager.get_user(user_id)
+        if not user:
+            messagebox.showerror("错误 / Error", f"用户 {user_id} 不存在 / User {user_id} not found")
+            return
+
+        dialog = UserFormDialog(self.window, "更新用户 / Update User", initial_data=user)
+        if dialog.result:
+            try:
+                success = self.manager.update_user(user_id, **dialog.result)
+                if success:
+                    messagebox.showinfo("成功 / Success", f"用户 {user_id} 更新成功！\nUser {user_id} updated successfully!")
+                    self._refresh_user_list()
+                    if hasattr(self.parent, "_load_user_list"):
+                        self.parent._load_user_list()
+                else:
+                    messagebox.showerror("错误 / Error", "更新失败 / Update failed")
+            except Exception as e:
+                messagebox.showerror("错误 / Error", f"更新失败: {e}\nUpdate failed: {e}")
+
+    def _delete_user(self) -> None:
+        """删除用户"""
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("警告 / Warning", "请先选择一个用户 / Please select a user first")
+            return
+
+        item = self.tree.item(selection[0])
+        user_id = item["values"][0]
+
+        confirm = messagebox.askyesno(
+            "确认删除 / Confirm Delete",
+            f"确定要删除用户 {user_id} 吗？\nAre you sure you want to delete user {user_id}?",
+        )
+        if not confirm:
+            return
+
+        cascade = messagebox.askyesno(
+            "级联删除 / Cascade Delete",
+            "是否同时删除关联数据（训练、营养等）？\nDelete associated data (workouts, nutrition, etc.)?",
+        )
+
+        try:
+            success = self.manager.delete_user(user_id, cascade=cascade)
+            if success:
+                messagebox.showinfo("成功 / Success", f"用户 {user_id} 已删除\nUser {user_id} deleted")
+                self._refresh_user_list()
+                if hasattr(self.parent, "_load_user_list"):
+                    self.parent._load_user_list()
+            else:
+                messagebox.showerror("错误 / Error", "删除失败 / Delete failed")
+        except Exception as e:
+            messagebox.showerror("错误 / Error", f"删除失败: {e}\nDelete failed: {e}")
+
+
+class UserFormDialog:
+    """用户表单对话框"""
+
+    def __init__(self, parent, title: str, initial_data: Optional[dict] = None) -> None:
+        self.result = None
+        self.initial_data = initial_data or {}
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(title)
+        self.dialog.geometry("400x500")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        self._build_form()
+
+    def _build_form(self) -> None:
+        frame = tk.Frame(self.dialog)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        fields = [
+            ("age", "Age", float),
+            ("gender", "Gender", str),
+            ("weight", "Weight (kg)", float),
+            ("height", "Height (cm)", float),
+            ("fat_percentage", "Fat Percentage", float),
+            ("lean_mass_kg", "Lean Mass (kg)", float),
+            ("experience_level", "Experience Level", str),
+            ("workout_frequency", "Workout Frequency", float),
+            ("water_intake", "Water Intake (L)", float),
+            ("resting_bpm", "Resting BPM", float),
+        ]
+
+        self.entries = {}
+        for field_name, label, field_type in fields:
+            row = tk.Frame(frame)
+            row.pack(fill=tk.X, pady=5)
+
+            tk.Label(row, text=f"{label}:", width=20, anchor="w").pack(side=tk.LEFT)
+            entry = tk.Entry(row)
+            entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            # 填充初始值
+            if field_name in self.initial_data and self.initial_data[field_name] is not None:
+                entry.insert(0, str(self.initial_data[field_name]))
+
+            self.entries[field_name] = (entry, field_type)
+
+        # 按钮
+        button_frame = tk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=20)
+
+        tk.Button(button_frame, text="确定 / OK", command=self._ok).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="取消 / Cancel", command=self._cancel).pack(side=tk.LEFT, padx=5)
+
+    def _ok(self) -> None:
+        """确定按钮处理"""
+        self.result = {}
+        for field_name, (entry, field_type) in self.entries.items():
+            value = entry.get().strip()
+            if value:
+                try:
+                    if field_type == float:
+                        self.result[field_name] = float(value)
+                    else:
+                        self.result[field_name] = value
+                except ValueError:
+                    messagebox.showerror("错误 / Error", f"无效的 {field_name} 值 / Invalid {field_name} value")
+                    return
+            else:
+                # 空值不添加到结果中（使用 None 表示跳过）
+                pass
+
+        self.dialog.destroy()
+
+    def _cancel(self) -> None:
+        """取消按钮处理"""
+        self.dialog.destroy()
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from database import DatabaseManager
 from importer import DataImporter
 from renderer import TemplateRenderer
 from templates import seed_templates
+from user_manager import UserManager
 
 
 DB_PATH = Path(__file__).resolve().parent.parent / "fitness.db"
@@ -18,6 +19,7 @@ db.create_tables()
 seed_templates(db)
 renderer = TemplateRenderer(db)
 importer = DataImporter(db)
+user_manager = UserManager(db)
 
 
 def home(request: HttpRequest) -> HttpResponse:
@@ -202,5 +204,153 @@ def summary_view(_: HttpRequest) -> JsonResponse:
         ]
 
         return JsonResponse({"ok": True, "summary": data})
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@require_GET
+def get_user_view(request: HttpRequest) -> JsonResponse:
+    """获取单个用户详细信息"""
+    try:
+        user_id = int(request.GET.get("user_id", "0"))
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Invalid user_id"}, status=400)
+    
+    try:
+        user = user_manager.get_user(user_id)
+        if not user:
+            return JsonResponse({"ok": False, "error": "User not found"}, status=404)
+        
+        # 获取用户统计信息
+        stats = user_manager.get_user_statistics(user_id)
+        
+        return JsonResponse({
+            "ok": True,
+            "user": user,
+            "statistics": stats or {}
+        })
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@require_GET
+def list_users_detail_view(request: HttpRequest) -> JsonResponse:
+    """获取用户列表（包含详细信息）"""
+    try:
+        limit = int(request.GET.get("limit", "50"))
+        offset = int(request.GET.get("offset", "0"))
+        search = request.GET.get("search", "").strip() or None
+    except (ValueError, NameError):
+        limit = 50
+        offset = 0
+        search = None
+    
+    try:
+        users = user_manager.list_users(limit=limit, offset=offset, search=search)
+        total = user_manager.count_users()
+        return JsonResponse({
+            "ok": True,
+            "users": users,
+            "total": total
+        })
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@require_POST
+def create_user_view(request: HttpRequest) -> JsonResponse:
+    """创建新用户"""
+    try:
+        data = {}
+        
+        # 解析可选字段
+        if request.POST.get("age"):
+            data["age"] = float(request.POST.get("age"))
+        if request.POST.get("gender"):
+            data["gender"] = request.POST.get("gender")
+        if request.POST.get("weight"):
+            data["weight"] = float(request.POST.get("weight"))
+        if request.POST.get("height"):
+            data["height"] = float(request.POST.get("height"))
+        if request.POST.get("fat_percentage"):
+            data["fat_percentage"] = float(request.POST.get("fat_percentage"))
+        if request.POST.get("lean_mass_kg"):
+            data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
+        if request.POST.get("experience_level"):
+            data["experience_level"] = request.POST.get("experience_level")
+        if request.POST.get("workout_frequency"):
+            data["workout_frequency"] = float(request.POST.get("workout_frequency"))
+        if request.POST.get("water_intake"):
+            data["water_intake"] = float(request.POST.get("water_intake"))
+        if request.POST.get("resting_bpm"):
+            data["resting_bpm"] = float(request.POST.get("resting_bpm"))
+        
+        user_id = user_manager.create_user(**data)
+        return JsonResponse({"ok": True, "user_id": user_id})
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": f"Invalid input: {e}"}, status=400)
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@require_POST
+def update_user_view(request: HttpRequest) -> JsonResponse:
+    """更新用户信息"""
+    try:
+        user_id = int(request.POST.get("user_id", "0"))
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Invalid user_id"}, status=400)
+    
+    try:
+        data = {}
+        
+        # 解析可选字段
+        if request.POST.get("age"):
+            data["age"] = float(request.POST.get("age"))
+        if request.POST.get("gender"):
+            data["gender"] = request.POST.get("gender")
+        if request.POST.get("weight"):
+            data["weight"] = float(request.POST.get("weight"))
+        if request.POST.get("height"):
+            data["height"] = float(request.POST.get("height"))
+        if request.POST.get("fat_percentage"):
+            data["fat_percentage"] = float(request.POST.get("fat_percentage"))
+        if request.POST.get("lean_mass_kg"):
+            data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
+        if request.POST.get("experience_level"):
+            data["experience_level"] = request.POST.get("experience_level")
+        if request.POST.get("workout_frequency"):
+            data["workout_frequency"] = float(request.POST.get("workout_frequency"))
+        if request.POST.get("water_intake"):
+            data["water_intake"] = float(request.POST.get("water_intake"))
+        if request.POST.get("resting_bpm"):
+            data["resting_bpm"] = float(request.POST.get("resting_bpm"))
+        
+        success = user_manager.update_user(user_id, **data)
+        if not success:
+            return JsonResponse({"ok": False, "error": "User not found or update failed"}, status=404)
+        
+        return JsonResponse({"ok": True, "user_id": user_id})
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": f"Invalid input: {e}"}, status=400)
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@require_POST
+def delete_user_view(request: HttpRequest) -> JsonResponse:
+    """删除用户"""
+    try:
+        user_id = int(request.POST.get("user_id", "0"))
+        cascade = request.POST.get("cascade", "false").lower() == "true"
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Invalid user_id"}, status=400)
+    
+    try:
+        success = user_manager.delete_user(user_id, cascade=cascade)
+        if not success:
+            return JsonResponse({"ok": False, "error": "User not found or delete failed"}, status=404)
+        
+        return JsonResponse({"ok": True, "user_id": user_id})
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
