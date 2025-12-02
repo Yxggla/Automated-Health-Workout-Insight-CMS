@@ -114,12 +114,18 @@ class DataImporter:
 
         # 清空现有数据
         if clear_existing:
-            self.db.truncate_tables(["users", "workouts", "nutrition", "workout_analysis"])
+            # 同步清空两套表结构，避免旧数据残留
+            self.db.truncate_tables(
+                ["users", "workouts", "nutrition", "workout_analysis", "user", "workout", "derived_metrics"]
+            )
 
-        user_rows = []
-        workout_rows = []
+        users_rows = []  # 复数 users 表
+        user_rows = []  # 单数 user 表（兼容旧逻辑）
+        workout_rows = []  # 复数 workouts 表
+        workout_basic_rows = []  # 单数 workout 表
         nutrition_rows = []
         analysis_rows = []
+        metrics_rows = []
 
         for idx, row in df.iterrows():
             # 优先使用CSV中的user_id，如果没有则使用行号
@@ -128,8 +134,24 @@ class DataImporter:
             else:
                 user_id = idx + 1  # 如果没有user_id列，使用行号作为默认ID
             
-            # users 表数据
-            user_rows.append(
+            # users / user 表数据
+            users_rows.append(
+                (
+                    user_id,
+                    row.get("age"),
+                    row.get("gender", ""),
+                    row.get("weight"),
+                    row.get("height"),
+                    row.get("bmi"),
+                    row.get("fat_percentage"),
+                    row.get("lean_mass_kg"),
+                    row.get("experience_level", ""),
+                    row.get("workout_frequency"),
+                    row.get("water_intake"),
+                    row.get("resting_bpm"),
+                )
+            )
+            user_rows.append(  # 兼容单数 user 表
                 (
                     user_id,
                     row.get("gender", ""),
@@ -137,14 +159,10 @@ class DataImporter:
                     row.get("height"),
                     row.get("weight"),
                     row.get("bmi"),
-                    row.get("fat_percentage"),
-                    row.get("lean_mass_kg"),
-                    row.get("experience_level", ""),
-                    row.get("workout_frequency"),
                 )
             )
             
-            # workouts 表数据
+            # workouts / workout 表数据
             workout_rows.append(
                 (
                     user_id,
@@ -161,6 +179,17 @@ class DataImporter:
                     row.get("equipment_needed", ""),
                     row.get("difficulty_level", ""),
                     row.get("body_part", ""),
+                )
+            )
+            workout_basic_rows.append(
+                (
+                    user_id,
+                    row.get("workout_type", ""),
+                    row.get("session_duration"),
+                    row.get("calories_burned"),
+                    row.get("max_bpm"),
+                    row.get("avg_bpm"),
+                    row.get("resting_bpm"),
                 )
             )
             
@@ -206,11 +235,26 @@ class DataImporter:
                     (100 - (row.get("resting_bpm", 70) - 60)) / 40 * 100 if pd.notna(row.get("resting_bpm")) else None,
                 )
             )
+            # derived_metrics 表数据（用于体成分/补水）
+            metrics_rows.append(
+                (
+                    user_id,
+                    row.get("fat_percentage"),
+                    row.get("water_intake"),
+                    row.get("lean_mass_kg"),
+                    row.get("cal_balance"),
+                )
+            )
 
         # 插入数据到各表
         self.db.insert_many(
             "users",
-            ["user_id", "gender", "age", "height", "weight", "bmi", "fat_percentage", "lean_mass_kg", "experience_level", "workout_frequency"],
+            ["user_id", "age", "gender", "weight", "height", "bmi", "fat_percentage", "lean_mass_kg", "experience_level", "workout_frequency", "water_intake", "resting_bpm"],
+            users_rows,
+        )
+        self.db.insert_many(
+            "user",
+            ["user_id", "gender", "age", "height", "weight", "bmi"],
             user_rows,
         )
         
@@ -222,6 +266,19 @@ class DataImporter:
                 "target_muscle_group", "equipment_needed", "difficulty_level", "body_part"
             ],
             workout_rows,
+        )
+        self.db.insert_many(
+            "workout",
+            [
+                "user_id",
+                "workout_type",
+                "session_duration",
+                "calories_burned",
+                "max_bpm",
+                "avg_bpm",
+                "resting_bpm",
+            ],
+            workout_basic_rows,
         )
         
         self.db.insert_many(
@@ -242,6 +299,17 @@ class DataImporter:
                 "training_efficiency", "muscle_focus_score", "recovery_index"
             ],
             analysis_rows,
+        )
+        self.db.insert_many(
+            "derived_metrics",
+            [
+                "user_id",
+                "fat_percentage",
+                "water_intake",
+                "lean_mass_kg",
+                "cal_balance",
+            ],
+            metrics_rows,
         )
         
         return len(df)

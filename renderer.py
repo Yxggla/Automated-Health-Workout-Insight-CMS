@@ -60,11 +60,21 @@ class TemplateRenderer:
         # 修复：使用 calories 而不是 calories_intake
         "calories_intake": "SELECT ROUND(AVG(calories), 2) AS val FROM nutrition",
         
-        # 修复：water_intake 现在在 users 表中
         "water_intake": "SELECT ROUND(AVG(water_intake), 2) AS val FROM users",
 
         "fat_percentage": "SELECT ROUND(AVG(fat_percentage), 2) AS val FROM users",
         "lean_mass_kg": "SELECT ROUND(AVG(lean_mass_kg), 2) AS val FROM users",
+        "weight": "SELECT ROUND(AVG(weight), 2) AS val FROM users",
+        "height": "SELECT ROUND(AVG(height), 2) AS val FROM users",
+        "age": "SELECT ROUND(AVG(age), 2) AS val FROM users",
+        "gender": """
+            SELECT gender AS val
+            FROM users
+            WHERE gender IS NOT NULL AND gender != ''
+            GROUP BY gender
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
         "session_duration": """
             SELECT ROUND(session_duration, 2) AS val
             FROM workouts
@@ -252,37 +262,79 @@ class TemplateRenderer:
         self.db = db
 
     def _fetch_value(self, placeholder: str, user_id: Optional[int] = None) -> Optional[str]:
+        if placeholder == "water_intake":
+            return self._fetch_water_intake(user_id)
+
         query = self.PLACEHOLDER_QUERIES.get(placeholder)
         if not query:
             return None
         try:
             # 如果提供了 user_id，修改查询以支持用户过滤
-            if user_id is not None:
+            if user_id is not None and placeholder != "water_intake":
                 query = self._add_user_filter(query, user_id)
             
             row = self.db.execute(query, fetchone=True)
-            if not row:
-                return None
-            value = row["val"]
-            return "N/A" if value is None else str(value)
+            value = row["val"] if row else None
+
+            # water_intake 兜底：如果 users 没有数据，尝试 derived_metrics
+            if placeholder == "water_intake" and (value is None or value == ""):
+                try:
+                    row_dm = self.db.execute(
+                        "SELECT ROUND(AVG(water_intake), 2) AS val FROM derived_metrics WHERE water_intake IS NOT NULL",
+                        fetchone=True,
+                    )
+                    value = row_dm["val"] if row_dm else value
+                except Exception:
+                    pass
+
+            if value is None:
+                return "0"
+            return str(value)
         except Exception as e:
             print(f"Error fetching placeholder '{placeholder}': {e}")
             return "N/A"
 
+    def _fetch_water_intake(self, user_id: Optional[int]) -> str:
+        """专门处理补水，容错缺表/缺数据，用户过滤可选。"""
+        # 优先 derived_metrics
+        try:
+            q = "SELECT ROUND(AVG(water_intake), 2) AS val FROM derived_metrics WHERE water_intake IS NOT NULL"
+            if user_id is not None:
+                q += f" AND user_id = {user_id}"
+            row = self.db.execute(q, fetchone=True)
+            if row and row["val"] is not None:
+                return str(row["val"])
+        except Exception:
+            pass
+
+        # 回退 users
+        try:
+            q = "SELECT ROUND(AVG(water_intake), 2) AS val FROM users WHERE water_intake IS NOT NULL"
+            if user_id is not None:
+                q += f" AND user_id = {user_id}"
+            row = self.db.execute(q, fetchone=True)
+            if row and row["val"] is not None:
+                return str(row["val"])
+        except Exception:
+            pass
+
+        return "0"
+
     def _add_user_filter(self, query: str, user_id: int) -> str:
         """在查询中添加用户过滤条件，将全局查询转换为个性化查询"""
         query_lower = query.lower()
+
+        # 含 JOIN 的查询逻辑复杂，避免自动插入过滤以免破坏语法
+        if " join " in query_lower:
+            return query
         
         # 如果查询已经包含 user_id 条件，直接返回
         if f"user_id = {user_id}" in query or f"user_id={user_id}" in query or f".user_id = {user_id}" in query:
             return query
         
-        # 对于包含子查询的复杂查询，使用包装查询方式
+        # 对于包含子查询的复杂查询，直接返回，避免破坏语法
         if query_lower.count("select") > 1:
-            # 复杂查询，在外层添加过滤
-            # 包装查询：SELECT * FROM (原查询) WHERE user_id = ?
-            # 但这需要知道主表，所以采用简单策略：在可能的地方添加过滤
-            return self._add_filter_to_complex_query(query, user_id)
+            return query
         
         # 简单查询：直接在主查询中添加 WHERE
         return self._add_filter_to_simple_query(query, user_id)
