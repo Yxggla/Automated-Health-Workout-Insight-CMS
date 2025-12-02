@@ -14,25 +14,10 @@ class DatabaseManager:
     def create_tables(self) -> None:
         """Create required tables if they do not exist."""
         schema = """
-        CREATE TABLE IF NOT EXISTS user (
-            user_id INTEGER PRIMARY KEY,
-            gender TEXT,
-            age REAL,
-            height REAL,
-            weight REAL,
-            bmi REAL
-        );
-        CREATE TABLE IF NOT EXISTS workout (
-            workout_id INTEGER PRIMARY KEY,
-            user_id INTEGER,
-            workout_type TEXT,
-            session_duration REAL,
-            calories_burned REAL,
-            max_bpm REAL,
-            avg_bpm REAL,
-            resting_bpm REAL,
-            FOREIGN KEY (user_id) REFERENCES user(user_id)
-        );
+        -- 清理旧的单数表，统一使用复数表
+        DROP TABLE IF EXISTS user;
+        DROP TABLE IF EXISTS workout;
+
         CREATE TABLE IF NOT EXISTS derived_metrics (
             metric_id INTEGER PRIMARY KEY,
             user_id INTEGER,
@@ -40,7 +25,7 @@ class DatabaseManager:
             water_intake REAL,
             lean_mass_kg REAL,
             cal_balance REAL,
-            FOREIGN KEY (user_id) REFERENCES user(user_id)
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
