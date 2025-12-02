@@ -66,7 +66,7 @@ def show_summary(db: DatabaseManager) -> None:
                ROUND(AVG(calories_burned), 2) AS avg_calories,
                ROUND(AVG(session_duration), 2) AS avg_duration,
                COUNT(*) AS sessions
-        FROM workout
+        FROM workouts
         GROUP BY workout_type
         ORDER BY avg_calories DESC
         LIMIT 5
@@ -84,13 +84,13 @@ def show_summary(db: DatabaseManager) -> None:
         SELECT u.user_id,
                u.gender,
                ROUND(u.age, 1) AS age,
-               ROUND(d.cal_balance, 2) AS cal_balance,
+               ROUND(wa.cal_balance, 2) AS cal_balance,
                ROUND(w.session_duration, 2) AS session_duration
-        FROM derived_metrics d
-        JOIN user u ON u.user_id = d.user_id
-        JOIN workout w ON w.user_id = u.user_id
-        WHERE d.cal_balance IS NOT NULL
-        ORDER BY d.cal_balance ASC
+        FROM workout_analysis wa
+        JOIN users u ON u.user_id = wa.user_id
+        JOIN workouts w ON w.user_id = u.user_id
+        WHERE wa.cal_balance IS NOT NULL
+        ORDER BY wa.cal_balance ASC
         LIMIT 5
         """,
         fetchall=True,
@@ -106,7 +106,7 @@ def show_summary(db: DatabaseManager) -> None:
         SELECT ROUND(AVG(carbs), 2) AS carbs,
                ROUND(AVG(proteins), 2) AS proteins,
                ROUND(AVG(fats), 2) AS fats,
-               ROUND(AVG(calories_intake), 2) AS calories
+               ROUND(AVG(calories), 2) AS calories
         FROM nutrition
         """,
         fetchone=True,
@@ -115,6 +115,29 @@ def show_summary(db: DatabaseManager) -> None:
         print(
             f"- Carbs {row['carbs']} g, Protein {row['proteins']} g, Fats {row['fats']} g, Calories {row['calories']} kcal"
         )
+
+    # 新增：训练效率分析
+    print("\nTraining efficiency analysis:")
+    rows = db.execute(
+        """
+        SELECT w.workout_type,
+               ROUND(AVG(wa.training_efficiency), 2) AS avg_efficiency,
+               ROUND(AVG(wa.muscle_focus_score), 2) AS avg_focus,
+               ROUND(AVG(wa.recovery_index), 2) AS avg_recovery
+        FROM workouts w
+        JOIN workout_analysis wa ON w.user_id = wa.user_id
+        WHERE wa.training_efficiency IS NOT NULL
+        GROUP BY w.workout_type
+        ORDER BY avg_efficiency DESC
+        LIMIT 5
+        """,
+        fetchall=True,
+    )
+    for row in rows or []:
+        print(
+            f"- {row['workout_type']}: Efficiency {row['avg_efficiency']}, Focus {row['avg_focus']}, Recovery {row['avg_recovery']}"
+        )
+
     print("\n-------------------------------\n")
 
 
