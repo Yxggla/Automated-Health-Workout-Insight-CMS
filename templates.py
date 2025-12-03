@@ -69,6 +69,15 @@ def seed_templates(db) -> None:
                 (tpl["name"], tpl["text"]),
             )
 
+
+def seed_templates_if_empty(db) -> None:
+    """Only seed defaults when templates table is empty."""
+    row = db.execute("SELECT COUNT(*) AS c FROM templates", fetchone=True)
+    count = row["c"] if row else 0
+    if count and count > 0:
+        return
+    seed_templates(db)
+
 """
 个性化训练计划：利用经验等级和训练频率提供个性化建议
 
