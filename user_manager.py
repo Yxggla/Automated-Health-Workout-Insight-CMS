@@ -13,7 +13,7 @@ class UserManager:
         row = self.db.execute(
             """
             SELECT user_id, age, gender, weight, height, bmi, 
-                   fat_percentage, lean_mass_kg, 
+                   fat_percentage, lean_mass_kg, experience_level, 
                    workout_frequency, water_intake, resting_bpm
             FROM users
             WHERE user_id = ?
@@ -37,20 +37,20 @@ class UserManager:
         Args:
             limit: 返回的最大记录数
             offset: 偏移量
-            search: 搜索关键词（在 gender 中搜索）
+            search: 搜索关键词（在 gender 或 experience_level 中搜索）
         """
         query = """
             SELECT user_id, age, gender, weight, height, bmi, 
-                   fat_percentage, lean_mass_kg, 
+                   fat_percentage, lean_mass_kg, experience_level, 
                    workout_frequency, water_intake, resting_bpm
             FROM users
         """
         params = []
         
         if search:
-            query += " WHERE gender LIKE ?"
+            query += " WHERE gender LIKE ? OR experience_level LIKE ?"
             search_pattern = f"%{search}%"
-            params.append(search_pattern)
+            params.extend([search_pattern, search_pattern])
         
         query += " ORDER BY user_id " + ("DESC" if order_desc else "ASC")
         
@@ -70,6 +70,7 @@ class UserManager:
         bmi: Optional[float] = None,
         fat_percentage: Optional[float] = None,
         lean_mass_kg: Optional[float] = None,
+        experience_level: Optional[str] = None,
         workout_frequency: Optional[float] = None,
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
@@ -115,6 +116,10 @@ class UserManager:
             columns.append("lean_mass_kg")
             values.append(lean_mass_kg)
             placeholders.append("?")
+        if experience_level is not None:
+            columns.append("experience_level")
+            values.append(experience_level)
+            placeholders.append("?")
         if workout_frequency is not None:
             columns.append("workout_frequency")
             values.append(workout_frequency)
@@ -154,6 +159,7 @@ class UserManager:
         bmi: Optional[float] = None,
         fat_percentage: Optional[float] = None,
         lean_mass_kg: Optional[float] = None,
+        experience_level: Optional[str] = None,
         workout_frequency: Optional[float] = None,
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
@@ -200,6 +206,9 @@ class UserManager:
         if lean_mass_kg is not None:
             updates.append("lean_mass_kg = ?")
             values.append(lean_mass_kg)
+        if experience_level is not None:
+            updates.append("experience_level = ?")
+            values.append(experience_level)
         if workout_frequency is not None:
             updates.append("workout_frequency = ?")
             values.append(workout_frequency)

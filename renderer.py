@@ -74,6 +74,13 @@ class TemplateRenderer:
             ORDER BY COUNT(*) DESC
             LIMIT 1
         """,
+        "experience_level": """
+            SELECT experience_level AS val
+            FROM users
+            GROUP BY experience_level
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
         "session_duration": """
             SELECT ROUND(session_duration, 2) AS val
             FROM workouts
@@ -87,13 +94,6 @@ class TemplateRenderer:
         "muscle_focus_score": "SELECT ROUND(AVG(muscle_focus_score), 2) AS val FROM workout_analysis",
         "recovery_index": "SELECT ROUND(AVG(recovery_index), 2) AS val FROM workout_analysis",
         "workout_frequency": "SELECT ROUND(AVG(workout_frequency), 2) AS val FROM users",
-        "experience_level": """
-            SELECT experience_level AS val
-            FROM users
-            GROUP BY experience_level
-            ORDER BY COUNT(*) DESC
-            LIMIT 1
-        """,
         "daily_meals_frequency": "SELECT ROUND(AVG(daily_meals_frequency), 2) AS val FROM nutrition",
         "sets": "SELECT ROUND(AVG(sets), 2) AS val FROM workouts",
         "reps": "SELECT ROUND(AVG(reps), 2) AS val FROM workouts",

@@ -67,7 +67,7 @@ class DataImporter:
     def __init__(self, db: DatabaseManager):
         self.db = db
 
-    def import_csv(self, csv_path: str = "Final_data.csv", clear_existing: bool = True) -> int:
+    def import_csv(self, csv_path: str = "Final_data (1).csv", clear_existing: bool = True) -> int:
         """Read the CSV, normalize columns, and insert into tables. Returns row count."""
         path = Path(csv_path)
         if not path.exists():

@@ -293,6 +293,8 @@ def create_user_view(request: HttpRequest) -> JsonResponse:
             data["fat_percentage"] = float(request.POST.get("fat_percentage"))
         if request.POST.get("lean_mass_kg"):
             data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
+        if request.POST.get("experience_level"):
+            data["experience_level"] = request.POST.get("experience_level")
         if request.POST.get("workout_frequency"):
             data["workout_frequency"] = float(request.POST.get("workout_frequency"))
         if request.POST.get("water_intake"):
@@ -332,6 +334,8 @@ def update_user_view(request: HttpRequest) -> JsonResponse:
             data["fat_percentage"] = float(request.POST.get("fat_percentage"))
         if request.POST.get("lean_mass_kg"):
             data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
+        if request.POST.get("experience_level"):
+            data["experience_level"] = request.POST.get("experience_level")
         if request.POST.get("workout_frequency"):
             data["workout_frequency"] = float(request.POST.get("workout_frequency"))
         if request.POST.get("water_intake"):
