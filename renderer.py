@@ -57,7 +57,6 @@ class TemplateRenderer:
         "protein": "SELECT ROUND(AVG(proteins), 2) AS val FROM nutrition",
         "carbs": "SELECT ROUND(AVG(carbs), 2) AS val FROM nutrition",
         "fat": "SELECT ROUND(AVG(fats), 2) AS val FROM nutrition",
-        # 修复：使用 calories 而不是 calories_intake
         "calories_intake": "SELECT ROUND(AVG(calories), 2) AS val FROM nutrition",
         
         "water_intake": "SELECT ROUND(AVG(water_intake), 2) AS val FROM users",
@@ -84,7 +83,6 @@ class TemplateRenderer:
             ORDER BY calories_burned DESC
             LIMIT 1
         """,
-        # 新增占位符查询
         "training_efficiency": "SELECT ROUND(AVG(training_efficiency), 2) AS val FROM workout_analysis",
         "muscle_focus_score": "SELECT ROUND(AVG(muscle_focus_score), 2) AS val FROM workout_analysis",
         "recovery_index": "SELECT ROUND(AVG(recovery_index), 2) AS val FROM workout_analysis",
@@ -142,7 +140,6 @@ class TemplateRenderer:
             LIMIT 1
         """,
 
-        # 修复：meal_name 在 nutrition 表中
         "meal_name": """
             SELECT meal_name AS val
             FROM nutrition
@@ -166,7 +163,6 @@ class TemplateRenderer:
             LIMIT 1
         """,
        
-        # 修复：cooking_method 在 nutrition 表中
         "cooking_method": """
             SELECT cooking_method AS val
             FROM nutrition
@@ -195,7 +191,6 @@ class TemplateRenderer:
                 ELSE '极限表现'
             END AS val FROM workout_analysis
         """,
-        # 修复：cardiovascular_level 查询 - 确保所有使用的列都存在
         "cardiovascular_level": """
             SELECT CASE 
                 WHEN AVG(u.resting_bpm) < 60 AND AVG(wa.pct_hrr) > 0.7 THEN '优秀'
@@ -232,7 +227,6 @@ class TemplateRenderer:
             SELECT ROUND(AVG(proteins / weight), 2) AS val 
             FROM nutrition n JOIN users u ON n.user_id = u.user_id
         """,
-        # 新增字段查询
         "age": "SELECT ROUND(AVG(age), 1) AS val FROM users",
         "gender": """
             SELECT gender AS val
@@ -269,14 +263,12 @@ class TemplateRenderer:
         if not query:
             return None
         try:
-            # 如果提供了 user_id，修改查询以支持用户过滤
             if user_id is not None and placeholder != "water_intake":
                 query = self._add_user_filter(query, user_id)
             
             row = self.db.execute(query, fetchone=True)
             value = row["val"] if row else None
 
-            # water_intake 兜底：如果 users 没有数据，尝试 derived_metrics
             if placeholder == "water_intake" and (value is None or value == ""):
                 try:
                     row_dm = self.db.execute(
@@ -295,8 +287,6 @@ class TemplateRenderer:
             return "N/A"
 
     def _fetch_water_intake(self, user_id: Optional[int]) -> str:
-        """专门处理补水，容错缺表/缺数据，用户过滤可选。"""
-        # 优先 derived_metrics
         try:
             q = "SELECT ROUND(AVG(water_intake), 2) AS val FROM derived_metrics WHERE water_intake IS NOT NULL"
             if user_id is not None:
@@ -307,7 +297,6 @@ class TemplateRenderer:
         except Exception:
             pass
 
-        # 回退 users
         try:
             q = "SELECT ROUND(AVG(water_intake), 2) AS val FROM users WHERE water_intake IS NOT NULL"
             if user_id is not None:
@@ -321,14 +310,11 @@ class TemplateRenderer:
         return "0"
 
     def _add_user_filter(self, query: str, user_id: int) -> str:
-        """在查询中添加用户过滤条件，将全局查询转换为个性化查询"""
         query_lower = query.lower()
 
-        # 含 JOIN 的查询逻辑复杂，避免自动插入过滤以免破坏语法
         if " join " in query_lower:
             return query
         
-        # 如果查询已经包含 user_id 条件，直接返回
         if f"user_id = {user_id}" in query or f"user_id={user_id}" in query or f".user_id = {user_id}" in query:
             return query
         
@@ -384,9 +370,7 @@ class TemplateRenderer:
         """为复杂查询（包含子查询）添加用户过滤"""
         query_lower = query.lower()
         
-        # 对于 JOIN 查询，尝试在主表添加过滤
         if "join" in query_lower:
-            # 找到主表的别名
             alias_map = {
                 "from users u": "u.user_id",
                 "from workouts w": "w.user_id",
