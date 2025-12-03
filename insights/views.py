@@ -50,7 +50,7 @@ def import_csv_view(request: HttpRequest) -> JsonResponse:
             rows = importer.import_csv(tmp_path, clear_existing=True)
             Path(tmp_path).unlink(missing_ok=True)
         else:
-            csv_path = path_str or "Final_data.csv"
+            csv_path = path_str or "Final_data (1).csv"
             rows = importer.import_csv(csv_path, clear_existing=True)
         return JsonResponse({"ok": True, "rows": rows})
     except Exception as exc:  # noqa: BLE001
@@ -237,21 +237,38 @@ def get_user_view(request: HttpRequest) -> JsonResponse:
 def list_users_detail_view(request: HttpRequest) -> JsonResponse:
     """获取用户列表（包含详细信息）"""
     try:
-        limit = int(request.GET.get("limit", "50"))
-        offset = int(request.GET.get("offset", "0"))
+        # 支持 limit/offset 或 page/page_size，默认分页
+        page = int(request.GET.get("page", "1"))
+        page_size = int(request.GET.get("page_size", request.GET.get("limit", "50")))
+        if page < 1:
+            page = 1
+        if page_size <= 0:
+            page_size = 50
+        offset = (page - 1) * page_size
         search = request.GET.get("search", "").strip() or None
+        order = (request.GET.get("order") or "desc").lower()
     except (ValueError, NameError):
-        limit = 50
+        page = 1
+        page_size = 50
         offset = 0
         search = None
+        order = "desc"
     
     try:
-        users = user_manager.list_users(limit=limit, offset=offset, search=search)
+        users = user_manager.list_users(
+            limit=page_size,
+            offset=offset,
+            search=search,
+            order_desc=(order != "asc"),
+        )
         total = user_manager.count_users()
         return JsonResponse({
             "ok": True,
             "users": users,
-            "total": total
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "order": order,
         })
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
@@ -276,8 +293,6 @@ def create_user_view(request: HttpRequest) -> JsonResponse:
             data["fat_percentage"] = float(request.POST.get("fat_percentage"))
         if request.POST.get("lean_mass_kg"):
             data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
-        if request.POST.get("experience_level"):
-            data["experience_level"] = request.POST.get("experience_level")
         if request.POST.get("workout_frequency"):
             data["workout_frequency"] = float(request.POST.get("workout_frequency"))
         if request.POST.get("water_intake"):
@@ -317,8 +332,6 @@ def update_user_view(request: HttpRequest) -> JsonResponse:
             data["fat_percentage"] = float(request.POST.get("fat_percentage"))
         if request.POST.get("lean_mass_kg"):
             data["lean_mass_kg"] = float(request.POST.get("lean_mass_kg"))
-        if request.POST.get("experience_level"):
-            data["experience_level"] = request.POST.get("experience_level")
         if request.POST.get("workout_frequency"):
             data["workout_frequency"] = float(request.POST.get("workout_frequency"))
         if request.POST.get("water_intake"):
@@ -347,10 +360,14 @@ def delete_user_view(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "error": "Invalid user_id"}, status=400)
     
     try:
+        existing_user = user_manager.get_user(user_id)
+        if not existing_user:
+            return JsonResponse({"ok": False, "error": "用户不存在"}, status=404)
+
         success = user_manager.delete_user(user_id, cascade=cascade)
-        if not success:
-            return JsonResponse({"ok": False, "error": "User not found or delete failed"}, status=404)
-        
-        return JsonResponse({"ok": True, "user_id": user_id})
+        if success and not user_manager.get_user(user_id):
+            return JsonResponse({"ok": True, "user_id": user_id})
+
+        return JsonResponse({"ok": False, "error": "删除失败，用户仍存在"}, status=500)
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)

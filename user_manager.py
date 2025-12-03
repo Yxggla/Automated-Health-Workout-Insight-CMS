@@ -13,7 +13,7 @@ class UserManager:
         row = self.db.execute(
             """
             SELECT user_id, age, gender, weight, height, bmi, 
-                   fat_percentage, lean_mass_kg, experience_level, 
+                   fat_percentage, lean_mass_kg, 
                    workout_frequency, water_intake, resting_bpm
             FROM users
             WHERE user_id = ?
@@ -29,29 +29,30 @@ class UserManager:
         self, 
         limit: Optional[int] = None, 
         offset: int = 0,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        order_desc: bool = False,
     ) -> List[Dict]:
         """查询用户列表
         
         Args:
             limit: 返回的最大记录数
             offset: 偏移量
-            search: 搜索关键词（在 gender 或 experience_level 中搜索）
+            search: 搜索关键词（在 gender 中搜索）
         """
         query = """
             SELECT user_id, age, gender, weight, height, bmi, 
-                   fat_percentage, lean_mass_kg, experience_level, 
+                   fat_percentage, lean_mass_kg, 
                    workout_frequency, water_intake, resting_bpm
             FROM users
         """
         params = []
         
         if search:
-            query += " WHERE gender LIKE ? OR experience_level LIKE ?"
+            query += " WHERE gender LIKE ?"
             search_pattern = f"%{search}%"
-            params.extend([search_pattern, search_pattern])
+            params.append(search_pattern)
         
-        query += " ORDER BY user_id"
+        query += " ORDER BY user_id " + ("DESC" if order_desc else "ASC")
         
         if limit:
             query += " LIMIT ? OFFSET ?"
@@ -69,7 +70,6 @@ class UserManager:
         bmi: Optional[float] = None,
         fat_percentage: Optional[float] = None,
         lean_mass_kg: Optional[float] = None,
-        experience_level: Optional[str] = None,
         workout_frequency: Optional[float] = None,
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
@@ -81,7 +81,7 @@ class UserManager:
         """
         # 如果提供了 weight 和 height，自动计算 BMI
         if bmi is None and weight is not None and height is not None and height > 0:
-            bmi = weight / (height / 100) ** 2
+            bmi = weight / (height ** 2)
         
         columns = []
         values = []
@@ -115,10 +115,6 @@ class UserManager:
             columns.append("lean_mass_kg")
             values.append(lean_mass_kg)
             placeholders.append("?")
-        if experience_level is not None:
-            columns.append("experience_level")
-            values.append(experience_level)
-            placeholders.append("?")
         if workout_frequency is not None:
             columns.append("workout_frequency")
             values.append(workout_frequency)
@@ -131,10 +127,13 @@ class UserManager:
             columns.append("resting_bpm")
             values.append(resting_bpm)
             placeholders.append("?")
-        
+
         if not columns:
-            raise ValueError("至少需要提供一个用户字段")
-        
+            # 没有字段时插入空记录，仅生成自增 user_id
+            cursor = self.db.execute("INSERT INTO users DEFAULT VALUES")
+            self.db.conn.commit()
+            return cursor.lastrowid
+
         cols_str = ", ".join(columns)
         placeholders_str = ", ".join(placeholders)
         
@@ -155,7 +154,6 @@ class UserManager:
         bmi: Optional[float] = None,
         fat_percentage: Optional[float] = None,
         lean_mass_kg: Optional[float] = None,
-        experience_level: Optional[str] = None,
         workout_frequency: Optional[float] = None,
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
@@ -176,7 +174,7 @@ class UserManager:
                 current_weight = weight if weight is not None else user.get("weight")
                 current_height = height if height is not None else user.get("height")
                 if current_weight is not None and current_height is not None and current_height > 0:
-                    bmi = current_weight / (current_height / 100) ** 2
+                    bmi = current_weight / (current_height ** 2)
         
         updates = []
         values = []
@@ -202,9 +200,6 @@ class UserManager:
         if lean_mass_kg is not None:
             updates.append("lean_mass_kg = ?")
             values.append(lean_mass_kg)
-        if experience_level is not None:
-            updates.append("experience_level = ?")
-            values.append(experience_level)
         if workout_frequency is not None:
             updates.append("workout_frequency = ?")
             values.append(workout_frequency)
@@ -217,7 +212,7 @@ class UserManager:
         
         if not updates:
             return False
-        
+
         values.append(user_id)
         query = f"UPDATE users SET {', '.join(updates)} WHERE user_id = ?"
         
@@ -235,22 +230,17 @@ class UserManager:
         Returns:
             是否成功删除（如果用户不存在返回 False）
         """
-        # 检查用户是否存在
-        if not self.get_user(user_id):
-            return False
-        
         try:
-            if cascade:
-                # 级联删除关联数据
-                self.db.execute("DELETE FROM workout_analysis WHERE user_id = ?", (user_id,))
-                self.db.execute("DELETE FROM nutrition WHERE user_id = ?", (user_id,))
-                self.db.execute("DELETE FROM workouts WHERE user_id = ?", (user_id,))
-                self.db.execute("DELETE FROM derived_metrics WHERE user_id = ?", (user_id,))
-            
-            # 删除用户
-            self.db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-            self.db.conn.commit()
-            return True
+            with self.db.conn:
+                if cascade:
+                    # 级联删除关联数据
+                    self.db.execute("DELETE FROM workout_analysis WHERE user_id = ?", (user_id,))
+                    self.db.execute("DELETE FROM nutrition WHERE user_id = ?", (user_id,))
+                    self.db.execute("DELETE FROM workouts WHERE user_id = ?", (user_id,))
+                    self.db.execute("DELETE FROM derived_metrics WHERE user_id = ?", (user_id,))
+                cur = self.db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+                deleted = cur.rowcount if cur else 0
+                return deleted > 0
         except Exception as e:
             print(f"删除用户时出错: {e}")
             self.db.conn.rollback()
@@ -264,15 +254,13 @@ class UserManager:
         
         stats = {"user_info": user}
         
-        # 训练统计
+        # 训练统计（精简字段）
         workout_stats = self.db.execute(
             """
             SELECT 
-                COUNT(*) AS total_workouts,
-                ROUND(AVG(calories_burned), 2) AS avg_calories,
                 ROUND(SUM(calories_burned), 2) AS total_calories,
-                ROUND(AVG(session_duration), 2) AS avg_duration,
-                COUNT(DISTINCT workout_type) AS workout_types_count
+                ROUND(AVG(calories_burned), 2) AS avg_calories,
+                ROUND(AVG(session_duration), 2) AS avg_duration
             FROM workouts
             WHERE user_id = ?
             """,
@@ -281,13 +269,11 @@ class UserManager:
         )
         stats["workout_stats"] = dict(workout_stats) if workout_stats else {}
         
-        # 营养统计
+        # 营养统计（精简字段）
         nutrition_stats = self.db.execute(
             """
             SELECT 
-                COUNT(*) AS total_meals,
                 ROUND(AVG(calories), 2) AS avg_calories,
-                ROUND(SUM(calories), 2) AS total_calories,
                 ROUND(AVG(proteins), 2) AS avg_proteins,
                 ROUND(AVG(carbs), 2) AS avg_carbs,
                 ROUND(AVG(fats), 2) AS avg_fats
@@ -299,15 +285,13 @@ class UserManager:
         )
         stats["nutrition_stats"] = dict(nutrition_stats) if nutrition_stats else {}
         
-        # 分析统计
+        # 分析统计（精简字段）
         analysis_stats = self.db.execute(
             """
             SELECT 
-                COUNT(*) AS total_analyses,
-                ROUND(AVG(training_efficiency), 2) AS avg_efficiency,
-                ROUND(AVG(muscle_focus_score), 2) AS avg_focus,
-                ROUND(AVG(recovery_index), 2) AS avg_recovery,
-                ROUND(AVG(cal_balance), 2) AS avg_cal_balance
+                ROUND(AVG(cal_balance), 2) AS avg_cal_balance,
+                ROUND(AVG(training_efficiency), 2) AS avg_training_efficiency,
+                ROUND(AVG(recovery_index), 2) AS avg_recovery_index
             FROM workout_analysis
             WHERE user_id = ?
             """,
@@ -322,4 +306,3 @@ class UserManager:
         """返回用户总数"""
         row = self.db.execute("SELECT COUNT(*) AS count FROM users", fetchone=True)
         return row["count"] if row else 0
-
