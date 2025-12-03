@@ -9,7 +9,7 @@ from django.views.decorators.http import require_GET, require_POST
 from database import DatabaseManager
 from importer import DataImporter
 from renderer import TemplateRenderer
-from templates import seed_templates, seed_templates_if_empty
+from templates import seed_queries_if_empty, seed_templates, seed_templates_if_empty
 from user_manager import UserManager
 
 
@@ -17,6 +17,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "fitness.db"
 db = DatabaseManager(str(DB_PATH))
 db.create_tables()
 seed_templates_if_empty(db)
+seed_queries_if_empty(db)
 renderer = TemplateRenderer(db)
 importer = DataImporter(db)
 user_manager = UserManager(db)

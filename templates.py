@@ -59,6 +59,240 @@ DEFAULT_TEMPLATES = [
 ]
 
 
+DEFAULT_QUERIES = {
+    "avg_bpm": "SELECT ROUND(AVG(avg_bpm), 2) AS val FROM workouts",
+    "max_bpm": "SELECT ROUND(MAX(max_bpm), 2) AS val FROM workouts",
+    "resting_bpm": "SELECT ROUND(AVG(resting_bpm), 2) AS val FROM workouts",
+    "cal_burned": "SELECT ROUND(SUM(calories_burned), 2) AS val FROM workouts",
+    "avg_calories": """
+            SELECT ROUND(AVG(calories_burned), 2) AS val
+            FROM workouts
+            WHERE workout_type = (
+                SELECT workout_type
+                FROM workouts
+                GROUP BY workout_type
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+            )
+        """,
+    "bmi": "SELECT ROUND(AVG(bmi), 2) AS val FROM users",
+    "cal_balance": """
+            SELECT ROUND(cal_balance, 2) AS val
+            FROM workout_analysis
+            WHERE user_id = (
+                SELECT user_id
+                FROM workout_analysis
+                ORDER BY cal_balance ASC
+                LIMIT 1
+            )
+            LIMIT 1
+        """,
+    "workout_type": """
+            SELECT workout_type AS val
+            FROM workouts
+            GROUP BY workout_type
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "duration": "SELECT ROUND(AVG(session_duration), 2) AS val FROM workouts",
+    "avg_duration": """
+            SELECT ROUND(AVG(session_duration), 2) AS val
+            FROM workouts
+            WHERE workout_type = (
+                SELECT workout_type
+                FROM workouts
+                GROUP BY workout_type
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+            )
+        """,
+    "protein": "SELECT ROUND(AVG(proteins), 2) AS val FROM nutrition",
+    "carbs": "SELECT ROUND(AVG(carbs), 2) AS val FROM nutrition",
+    "fat": "SELECT ROUND(AVG(fats), 2) AS val FROM nutrition",
+    "calories_intake": "SELECT ROUND(AVG(calories), 2) AS val FROM nutrition",
+    "water_intake": "SELECT ROUND(AVG(water_intake), 2) AS val FROM users",
+    "fat_percentage": "SELECT ROUND(AVG(fat_percentage), 2) AS val FROM users",
+    "lean_mass_kg": "SELECT ROUND(AVG(lean_mass_kg), 2) AS val FROM users",
+    "weight": "SELECT ROUND(AVG(weight), 2) AS val FROM users",
+    "height": "SELECT ROUND(AVG(height), 2) AS val FROM users",
+    "age": "SELECT ROUND(AVG(age), 2) AS val FROM users",
+    "gender": """
+            SELECT gender AS val
+            FROM users
+            WHERE gender IS NOT NULL AND gender != ''
+            GROUP BY gender
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "experience_level": """
+            SELECT experience_level AS val
+            FROM users
+            GROUP BY experience_level
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "session_duration": """
+            SELECT ROUND(session_duration, 2) AS val
+            FROM workouts
+            WHERE user_id = (
+                SELECT user_id FROM workout_analysis ORDER BY cal_balance ASC LIMIT 1
+            )
+            ORDER BY calories_burned DESC
+            LIMIT 1
+        """,
+    "training_efficiency": "SELECT ROUND(AVG(training_efficiency), 2) AS val FROM workout_analysis",
+    "muscle_focus_score": "SELECT ROUND(AVG(muscle_focus_score), 2) AS val FROM workout_analysis",
+    "recovery_index": "SELECT ROUND(AVG(recovery_index), 2) AS val FROM workout_analysis",
+    "workout_frequency": "SELECT ROUND(AVG(workout_frequency), 2) AS val FROM users",
+    "daily_meals_frequency": "SELECT ROUND(AVG(daily_meals_frequency), 2) AS val FROM nutrition",
+    "sets": "SELECT ROUND(AVG(sets), 2) AS val FROM workouts",
+    "reps": "SELECT ROUND(AVG(reps), 2) AS val FROM workouts",
+    "name_of_exercise": """
+            SELECT name_of_exercise AS val
+            FROM workouts
+            GROUP BY name_of_exercise
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "target_muscle_group": """
+            SELECT target_muscle_group AS val
+            FROM workouts
+            GROUP BY target_muscle_group
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "equipment_needed": """
+            SELECT equipment_needed AS val
+            FROM workouts
+            GROUP BY equipment_needed
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "difficulty_level": """
+            SELECT difficulty_level AS val
+            FROM workouts
+            GROUP BY difficulty_level
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "body_part": """
+            SELECT body_part AS val
+            FROM workouts
+            GROUP BY body_part
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "type_of_muscle": """
+            SELECT type_of_muscle AS val
+            FROM workout_analysis
+            GROUP BY type_of_muscle
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "meal_name": """
+            SELECT meal_name AS val
+            FROM nutrition
+            WHERE meal_name IS NOT NULL AND meal_name != ''
+            GROUP BY meal_name
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "meal_type": """
+            SELECT meal_type AS val
+            FROM nutrition
+            GROUP BY meal_type
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "diet_type": """
+            SELECT diet_type AS val
+            FROM nutrition
+            GROUP BY diet_type
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "cooking_method": """
+            SELECT cooking_method AS val
+            FROM nutrition
+            WHERE cooking_method IS NOT NULL AND cooking_method != ''
+            GROUP BY cooking_method
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        """,
+    "pct_hrr": "SELECT ROUND(AVG(pct_hrr), 2) AS val FROM workout_analysis",
+    "pct_maxhr": "SELECT ROUND(AVG(pct_maxhr), 2) AS val FROM workout_analysis",
+    "expected_burn": "SELECT ROUND(AVG(expected_burn), 2) AS val FROM workout_analysis",
+    "training_zone": """
+            SELECT CASE 
+                WHEN AVG(pct_maxhr) < 0.6 THEN '恢复区'
+                WHEN AVG(pct_maxhr) BETWEEN 0.6 AND 0.7 THEN '脂肪燃烧区'
+                WHEN AVG(pct_maxhr) BETWEEN 0.7 AND 0.8 THEN '有氧区'
+                WHEN AVG(pct_maxhr) BETWEEN 0.8 AND 0.9 THEN '无氧区'
+                ELSE '极限区'
+            END AS val FROM workout_analysis
+        """,
+    "training_benefit": """
+            SELECT CASE 
+                WHEN AVG(pct_maxhr) < 0.7 THEN '脂肪燃烧和恢复'
+                WHEN AVG(pct_maxhr) BETWEEN 0.7 AND 0.8 THEN '心血管健康'
+                WHEN AVG(pct_maxhr) BETWEEN 0.8 AND 0.9 THEN '耐力提升'
+                ELSE '极限表现'
+            END AS val FROM workout_analysis
+        """,
+    "cardiovascular_level": """
+            SELECT CASE 
+                WHEN AVG(u.resting_bpm) < 60 AND AVG(wa.pct_hrr) > 0.7 THEN '优秀'
+                WHEN AVG(u.resting_bpm) < 70 AND AVG(wa.pct_hrr) > 0.6 THEN '良好'
+                WHEN AVG(u.resting_bpm) < 80 AND AVG(wa.pct_hrr) > 0.5 THEN '一般'
+                ELSE '需要改善'
+            END AS val 
+            FROM users u 
+            JOIN workout_analysis wa ON u.user_id = wa.user_id
+            WHERE u.resting_bpm IS NOT NULL AND wa.pct_hrr IS NOT NULL
+        """,
+    "weight_goal": """
+            SELECT CASE 
+                WHEN AVG(cal_balance) < -500 THEN '减重'
+                WHEN AVG(cal_balance) BETWEEN -500 AND 500 THEN '维持'
+                ELSE '增重'
+            END AS val FROM workout_analysis
+        """,
+    "calorie_recommendation": """
+            SELECT CASE 
+                WHEN AVG(cal_balance) < -500 THEN '适当增加200-300千卡摄入'
+                WHEN AVG(cal_balance) BETWEEN -500 AND 500 THEN '保持当前摄入水平'
+                ELSE '考虑减少300-500千卡摄入'
+            END AS val FROM workout_analysis
+        """,
+    "suggested_reps": """
+            SELECT CASE 
+                WHEN AVG(reps) < 8 THEN CAST(AVG(reps) + 2 AS TEXT)
+                WHEN AVG(reps) BETWEEN 8 AND 12 THEN CAST(AVG(reps) + 1 AS TEXT)
+                ELSE '保持当前次数，增加重量'
+            END AS val FROM workouts
+        """,
+    "protein_per_kg": """
+            SELECT ROUND(AVG(proteins / weight), 2) AS val 
+            FROM nutrition n JOIN users u ON n.user_id = u.user_id
+        """,
+    "sugar_g": "SELECT ROUND(AVG(sugar_g), 2) AS val FROM nutrition",
+    "sodium_mg": "SELECT ROUND(AVG(sodium_mg), 2) AS val FROM nutrition",
+    "cholesterol_mg": "SELECT ROUND(AVG(cholesterol_mg), 2) AS val FROM nutrition",
+    "serving_size_g": "SELECT ROUND(AVG(serving_size_g), 2) AS val FROM nutrition",
+    "prep_time_min": "SELECT ROUND(AVG(prep_time_min), 2) AS val FROM nutrition",
+    "cook_time_min": "SELECT ROUND(AVG(cook_time_min), 2) AS val FROM nutrition",
+    "rating": "SELECT ROUND(AVG(rating), 2) AS val FROM nutrition",
+    "burns_calories_per_30min": "SELECT ROUND(AVG(burns_calories_per_30min), 2) AS val FROM workouts",
+    "expected_burn_user": """
+            SELECT ROUND(expected_burn, 2) AS val
+            FROM workout_analysis
+            WHERE user_id = (
+                SELECT user_id FROM workout_analysis ORDER BY expected_burn DESC LIMIT 1
+            )
+        """,
+}
+
+
 def seed_templates(db) -> None:
     """Replace templates table with the current default set."""
     with db.conn:  # type: ignore[attr-defined]
@@ -77,6 +311,25 @@ def seed_templates_if_empty(db) -> None:
     if count and count > 0:
         return
     seed_templates(db)
+
+
+def seed_queries(db) -> None:
+    """Replace queries table with the current default set."""
+    with db.conn:  # type: ignore[attr-defined]
+        db.execute("DELETE FROM queries")
+        for key, sql in DEFAULT_QUERIES.items():
+            db.execute(
+                "INSERT INTO queries (query_key, query_sql) VALUES (?, ?)",
+                (key, sql),
+            )
+
+
+def seed_queries_if_empty(db) -> None:
+    row = db.execute("SELECT COUNT(*) AS c FROM queries", fetchone=True)
+    count = row["c"] if row else 0
+    if count and count > 0:
+        return
+    seed_queries(db)
 
 """
 个性化训练计划：利用经验等级和训练频率提供个性化建议

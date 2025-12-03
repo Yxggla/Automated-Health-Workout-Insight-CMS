@@ -98,10 +98,15 @@ class DatabaseManager:
             template_name TEXT,
             template_text TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS queries (
+            query_key TEXT PRIMARY KEY,
+            query_sql TEXT NOT NULL
+        );
         """
         with self.conn:
             self.conn.executescript(schema)
-        
+
         # 添加新增字段
         self._add_analysis_columns()
         self._add_user_columns()
