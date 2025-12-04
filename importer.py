@@ -201,15 +201,12 @@ class DataImporter:
                     row.get("benefit", ""),
                     row.get("burns_calories_per_30min"),
                     row.get("type_of_muscle", ""),
-                    # 计算训练效率 (基于卡路里燃烧和时长)
                     row.get("calories_burned", 0) / max(row.get("session_duration", 1), 0.1) if pd.notna(row.get("calories_burned")) and pd.notna(row.get("session_duration")) else None,
-                    # 计算肌肉专注度评分 (基于训练类型和目标肌群)
-                    0.8 if row.get("workout_type") == "Strength" else 0.6,  # 简化计算
-                    # 计算恢复指数 (基于静息心率和训练频率)
+                    0.8 if row.get("workout_type") == "Strength" else 0.6,
                     (100 - (row.get("resting_bpm", 70) - 60)) / 40 * 100 if pd.notna(row.get("resting_bpm")) else None,
                 )
             )
-            # derived_metrics 表数据（用于体成分/补水）
+            # derived_metrics 表数据
             metrics_rows.append(
                 (
                     user_id,
@@ -220,7 +217,6 @@ class DataImporter:
                 )
             )
 
-        # 插入数据到各表
         self.db.insert_many(
             "users",
             ["user_id", "age", "gender", "weight", "height", "bmi", "fat_percentage", "lean_mass_kg", "experience_level", "workout_frequency", "water_intake", "resting_bpm"],

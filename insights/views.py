@@ -222,7 +222,6 @@ def get_user_view(request: HttpRequest) -> JsonResponse:
         if not user:
             return JsonResponse({"ok": False, "error": "User not found"}, status=404)
         
-        # 获取用户统计信息
         stats = user_manager.get_user_statistics(user_id)
         
         return JsonResponse({
@@ -238,7 +237,6 @@ def get_user_view(request: HttpRequest) -> JsonResponse:
 def list_users_detail_view(request: HttpRequest) -> JsonResponse:
     """获取用户列表（包含详细信息）"""
     try:
-        # 支持 limit/offset 或 page/page_size，默认分页
         page = int(request.GET.get("page", "1"))
         page_size = int(request.GET.get("page_size", request.GET.get("limit", "50")))
         if page < 1:
@@ -281,7 +279,6 @@ def create_user_view(request: HttpRequest) -> JsonResponse:
     try:
         data = {}
         
-        # 解析可选字段
         if request.POST.get("age"):
             data["age"] = float(request.POST.get("age"))
         if request.POST.get("gender"):
@@ -322,7 +319,6 @@ def update_user_view(request: HttpRequest) -> JsonResponse:
     try:
         data = {}
         
-        # 解析可选字段
         if request.POST.get("age"):
             data["age"] = float(request.POST.get("age"))
         if request.POST.get("gender"):

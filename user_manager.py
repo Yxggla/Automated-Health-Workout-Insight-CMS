@@ -32,13 +32,6 @@ class UserManager:
         search: Optional[str] = None,
         order_desc: bool = False,
     ) -> List[Dict]:
-        """查询用户列表
-        
-        Args:
-            limit: 返回的最大记录数
-            offset: 偏移量
-            search: 搜索关键词（在 gender 或 experience_level 中搜索）
-        """
         query = """
             SELECT user_id, age, gender, weight, height, bmi, 
                    fat_percentage, lean_mass_kg, experience_level, 
@@ -46,7 +39,7 @@ class UserManager:
             FROM users
         """
         params = []
-        
+            
         if search:
             query += " WHERE gender LIKE ? OR experience_level LIKE ?"
             search_pattern = f"%{search}%"
@@ -80,7 +73,6 @@ class UserManager:
         Returns:
             新创建用户的 user_id
         """
-        # 如果提供了 weight 和 height，自动计算 BMI
         if bmi is None and weight is not None and height is not None and height > 0:
             bmi = weight / (height ** 2)
         
@@ -134,7 +126,6 @@ class UserManager:
             placeholders.append("?")
 
         if not columns:
-            # 没有字段时插入空记录，仅生成自增 user_id
             cursor = self.db.execute("INSERT INTO users DEFAULT VALUES")
             self.db.conn.commit()
             return cursor.lastrowid
@@ -169,11 +160,9 @@ class UserManager:
         Returns:
             是否成功更新（如果用户不存在返回 False）
         """
-        # 检查用户是否存在
         if not self.get_user(user_id):
             return False
         
-        # 如果更新了 weight 或 height，重新计算 BMI
         if bmi is None and (weight is not None or height is not None):
             user = self.get_user(user_id)
             if user:
@@ -242,7 +231,6 @@ class UserManager:
         try:
             with self.db.conn:
                 if cascade:
-                    # 级联删除关联数据
                     self.db.execute("DELETE FROM workout_analysis WHERE user_id = ?", (user_id,))
                     self.db.execute("DELETE FROM nutrition WHERE user_id = ?", (user_id,))
                     self.db.execute("DELETE FROM workouts WHERE user_id = ?", (user_id,))
@@ -263,7 +251,7 @@ class UserManager:
         
         stats = {"user_info": user}
         
-        # 训练统计（精简字段）
+        # 训练统计
         workout_stats = self.db.execute(
             """
             SELECT 
@@ -278,7 +266,7 @@ class UserManager:
         )
         stats["workout_stats"] = dict(workout_stats) if workout_stats else {}
         
-        # 营养统计（精简字段）
+        # 营养统计
         nutrition_stats = self.db.execute(
             """
             SELECT 
@@ -294,7 +282,7 @@ class UserManager:
         )
         stats["nutrition_stats"] = dict(nutrition_stats) if nutrition_stats else {}
         
-        # 分析统计（精简字段）
+        # 分析统计
         analysis_stats = self.db.execute(
             """
             SELECT 
