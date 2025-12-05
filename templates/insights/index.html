@@ -82,10 +82,13 @@
       if (result.ok) {
         const output = document.getElementById('output');
         if ((result.format || fmt) === 'markdown') {
+          output.classList.remove('whitespace-pre-wrap');
           output.innerHTML = marked.parse(result.content || '');
         } else if ((result.format || fmt) === 'html') {
+          output.classList.remove('whitespace-pre-wrap');
           output.innerHTML = result.content;
         } else {
+          output.classList.add('whitespace-pre-wrap');
           output.textContent = result.content;
         }
         status.textContent = '完成';

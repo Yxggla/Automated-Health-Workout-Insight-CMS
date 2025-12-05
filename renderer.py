@@ -84,6 +84,16 @@ class TemplateRenderer:
         # 直接追加 WHERE
         return sql + " WHERE user_id = ?", (user_id,)
 
+    def _emphasize_numbers(self, text: str, fmt: str) -> str:
+        """Highlight numeric values for markdown/html rendering."""
+        import re
+
+        if fmt == "markdown":
+            return re.sub(r"(\d+(?:\.\d+)?)", r"**\g<1>**", text)
+        if fmt == "html":
+            return re.sub(r"(\d+(?:\.\d+)?)", r"<strong>\g<1></strong>", text)
+        return text
+
     def render(self, template_id: int, output_format: str = "text", user_id: Optional[int] = None) -> str:
         tpl = self.db.execute(
             "SELECT template_text FROM templates WHERE template_id = ?",
@@ -99,7 +109,15 @@ class TemplateRenderer:
             rendered = self._render_placeholder(ph, user_id=user_id)
             content = content.replace(f"{{{ph}}}", rendered)
 
+        if output_format == "markdown":
+            emphasized = self._emphasize_numbers(content, "markdown")
+            return "## Fitness Report\n\n" + emphasized.replace("\n", "\n\n")
+
         if output_format == "html":
-            return content.replace("\n", "<br>")
+            emphasized = self._emphasize_numbers(content, "html")
+            paragraphs = "".join(
+                f"<p>{p.strip()}</p>" for p in emphasized.split("\n") if p.strip()
+            )
+            return paragraphs or emphasized.replace("\n", "<br>")
 
         return content
