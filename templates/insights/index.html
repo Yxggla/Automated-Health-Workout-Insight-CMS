@@ -6,7 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>健身洞察 Web</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
+    let renderFormat = 'text';
+    let currentTemplateId = null;
+
     function csrfToken() {
       const hidden = document.getElementById('csrf-token');
       if (hidden) return hidden.value;
@@ -68,17 +72,44 @@
       if (result.ok) await refreshTemplates();
     }
     async function renderTemplate(id) {
-      const fmt = "text";
+      currentTemplateId = id;
+      const fmt = renderFormat;
       const userSelect = document.getElementById('userSelect');
       const userVal = userSelect.value || '';
       const status = document.getElementById('status');
       status.textContent = '渲染中...';
       const result = await postForm('/api/render', { template_id: id, format: fmt, user_id: userVal });
       if (result.ok) {
-        document.getElementById('output').innerHTML = result.content;
+        const output = document.getElementById('output');
+        if ((result.format || fmt) === 'markdown') {
+          output.innerHTML = marked.parse(result.content || '');
+        } else if ((result.format || fmt) === 'html') {
+          output.innerHTML = result.content;
+        } else {
+          output.textContent = result.content;
+        }
         status.textContent = '完成';
       } else {
         status.textContent = `渲染失败：${result.error}`;
+      }
+    }
+
+    function setRenderFormat(fmt) {
+      renderFormat = fmt;
+      const buttons = ['text', 'markdown', 'html'];
+      buttons.forEach(key => {
+        const btn = document.getElementById(`fmt-${key}`);
+        if (!btn) return;
+        if (key === fmt) {
+          btn.classList.add('bg-slate-900', 'text-white');
+          btn.classList.remove('bg-slate-200', 'text-slate-800');
+        } else {
+          btn.classList.remove('bg-slate-900', 'text-white');
+          btn.classList.add('bg-slate-200', 'text-slate-800');
+        }
+      });
+      if (currentTemplateId) {
+        renderTemplate(currentTemplateId);
       }
     }
     async function loadSummary() {
@@ -374,6 +405,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      setRenderFormat('text');
       refreshTemplates();
       refreshUsers();
       loadSummary();
@@ -431,7 +463,14 @@
       <main class="lg:col-span-2 space-y-3">
         <div class="p-4 bg-white rounded border border-slate-200 min-h-[240px]">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="font-semibold">输出（Text）</h2>
+            <div class="flex items-center gap-3">
+              <h2 class="font-semibold">输出</h2>
+              <div class="flex items-center gap-1">
+                <button id="fmt-text" class="px-3 py-1 text-xs rounded bg-slate-900 text-white" onclick="setRenderFormat('text')">Text</button>
+                <button id="fmt-markdown" class="px-3 py-1 text-xs rounded bg-slate-200 text-slate-800" onclick="setRenderFormat('markdown')">Markdown</button>
+                <button id="fmt-html" class="px-3 py-1 text-xs rounded bg-slate-200 text-slate-800" onclick="setRenderFormat('html')">HTML</button>
+              </div>
+            </div>
             <span class="text-xs text-slate-500">点击左侧模板</span>
           </div>
           <div id="output" class="prose max-w-none whitespace-pre-wrap text-sm text-slate-800"></div>

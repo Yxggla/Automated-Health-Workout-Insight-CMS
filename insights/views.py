@@ -88,7 +88,9 @@ def render_template_view(request: HttpRequest) -> JsonResponse:
         template_id = int(request.POST.get("template_id", "0"))
     except ValueError:
         return JsonResponse({"ok": False, "error": "Invalid template_id"}, status=400)
-    fmt = "text"
+    fmt = request.POST.get("format", "text").lower()
+    if fmt not in {"text", "markdown", "html"}:
+        fmt = "text"
     user_val = request.POST.get("user_id")
     user_id: Optional[int] = None
     if user_val:
@@ -98,7 +100,7 @@ def render_template_view(request: HttpRequest) -> JsonResponse:
             user_id = None
     try:
         rendered = renderer.render(template_id, output_format=fmt, user_id=user_id)
-        return JsonResponse({"ok": True, "content": rendered})
+        return JsonResponse({"ok": True, "content": rendered, "format": fmt})
     except Exception as exc:  # noqa: BLE001
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 

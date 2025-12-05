@@ -98,4 +98,8 @@ class TemplateRenderer:
         for ph in placeholders:
             rendered = self._render_placeholder(ph, user_id=user_id)
             content = content.replace(f"{{{ph}}}", rendered)
+
+        if output_format == "html":
+            return content.replace("\n", "<br>")
+
         return content
