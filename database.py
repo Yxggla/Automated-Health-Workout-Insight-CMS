@@ -8,7 +8,6 @@ class DatabaseManager:
 
     def __init__(self, db_path: str = "fitness.db") -> None:
         self.db_path = db_path
-        # 允许跨线程访问（Django 视图线程）；SQLite 在单进程开发环境足够。
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
 

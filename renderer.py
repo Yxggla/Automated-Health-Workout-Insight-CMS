@@ -72,7 +72,17 @@ class TemplateRenderer:
 
         # 已有 WHERE，追加
         if " where " in lower_sql:
-            return sql.replace(" where ", " WHERE user_id = ? AND ", 1), (user_id,)
+            sql_with_filter = re.sub(
+                r"\bwhere\b",
+                "WHERE user_id = ? AND",
+                sql,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            # 如果未替换成功则避免绑定错误
+            if sql_with_filter == sql:
+                return sql, ()
+            return sql_with_filter, (user_id,)
 
         # 无 WHERE，在分组/排序/限制前插入
         insert_before = [" group by", " order by", " limit", " offset"]
