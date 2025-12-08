@@ -14,8 +14,6 @@ pip-wheel-metadata/
 # macOS
 .DS_Store
 
-# SQLite DB
-fitness.db
 
 
 # Logs
