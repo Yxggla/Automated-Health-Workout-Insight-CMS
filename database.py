@@ -14,7 +14,6 @@ class DatabaseManager:
     def create_tables(self) -> None:
         """Create required tables if they do not exist."""
         schema = """
-        -- 清理旧的单数表，统一使用复数表
         DROP TABLE IF EXISTS user;
         DROP TABLE IF EXISTS workout;
 
@@ -106,48 +105,42 @@ class DatabaseManager:
         with self.conn:
             self.conn.executescript(schema)
 
-        # 添加新增字段
         self._add_analysis_columns()
         self._add_user_columns()
 
     def _add_analysis_columns(self) -> None:
-        """为 workout_analysis 表添加分析指标字段"""
         try:
             with self.conn:
-                # 检查并添加 training_efficiency 列
                 self.conn.execute("""
                     ALTER TABLE workout_analysis ADD COLUMN training_efficiency REAL
                 """)
         except sqlite3.OperationalError:
-            pass  # 列已存在
+            pass
 
     def _add_user_columns(self) -> None:
-        """为 users 表补充新增列"""
         try:
             with self.conn:
                 self.conn.execute(
                     "ALTER TABLE users ADD COLUMN experience_level TEXT"
                 )
         except sqlite3.OperationalError:
-            pass  # 列已存在
+            pass
         
         try:
             with self.conn:
-                # 检查并添加 muscle_focus_score 列
                 self.conn.execute("""
                     ALTER TABLE workout_analysis ADD COLUMN muscle_focus_score REAL
                 """)
         except sqlite3.OperationalError:
-            pass  # 列已存在
+            pass
         
         try:
             with self.conn:
-                # 检查并添加 recovery_index 列
                 self.conn.execute("""
                     ALTER TABLE workout_analysis ADD COLUMN recovery_index REAL
                 """)
         except sqlite3.OperationalError:
-            pass  # 列已存在
+            pass
 
     def execute(
         self,

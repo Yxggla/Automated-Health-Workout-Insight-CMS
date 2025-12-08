@@ -39,11 +39,9 @@ class TemplateRenderer:
         if not row:
             return "N/A"
 
-        # 优先取别名 val，否则取第一列
         if hasattr(row, "keys") and "val" in row.keys():
             val = row["val"]
         else:
-            # sqlite Row 可使用索引访问
             val = row[0]
 
         if val is None:
@@ -55,22 +53,18 @@ class TemplateRenderer:
     def _apply_user_filter(self, sql: str, user_id: int) -> tuple[str, tuple]:
         """Attach user filter when possible.
 
-        优先使用显式占位符 {user_id}；如果原 SQL 已含 user_id 列或多表复杂 join，则保持不变。
-        对简单单表查询（users/workouts/nutrition/workout_analysis），注入 user_id 条件。
         """
         if "{user_id}" in sql:
             return sql.replace("{user_id}", "?"), (user_id,)
 
         lower_sql = sql.lower()
         if "user_id" in lower_sql:
-            return sql, ()  # 已处理
+            return sql, ()
 
-        # 仅对常用单表查询尝试注入过滤
         target_tables = [" from users", " from workouts", " from nutrition", " from workout_analysis"]
         if not any(t in lower_sql for t in target_tables):
             return sql, ()
 
-        # 已有 WHERE，追加
         if " where " in lower_sql:
             sql_with_filter = re.sub(
                 r"\bwhere\b",
@@ -79,19 +73,16 @@ class TemplateRenderer:
                 count=1,
                 flags=re.IGNORECASE,
             )
-            # 如果未替换成功则避免绑定错误
             if sql_with_filter == sql:
                 return sql, ()
             return sql_with_filter, (user_id,)
 
-        # 无 WHERE，在分组/排序/限制前插入
         insert_before = [" group by", " order by", " limit", " offset"]
         for kw in insert_before:
             idx = lower_sql.find(kw)
             if idx != -1:
                 return sql[:idx] + " WHERE user_id = ?" + sql[idx:], (user_id,)
 
-        # 直接追加 WHERE
         return sql + " WHERE user_id = ?", (user_id,)
 
     def _emphasize_numbers(self, text: str, fmt: str) -> str:

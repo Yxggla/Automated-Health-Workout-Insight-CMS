@@ -3,13 +3,11 @@ from database import DatabaseManager
 
 
 class UserManager:
-    """用户管理类，提供用户的 CRUD 操作"""
 
     def __init__(self, db: DatabaseManager):
         self.db = db
 
     def get_user(self, user_id: int) -> Optional[Dict]:
-        """根据 user_id 查询单个用户信息"""
         row = self.db.execute(
             """
             SELECT user_id, age, gender, weight, height, bmi, 
@@ -68,11 +66,6 @@ class UserManager:
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
     ) -> int:
-        """创建新用户
-        
-        Returns:
-            新创建用户的 user_id
-        """
         if bmi is None and weight is not None and height is not None and height > 0:
             bmi = weight / (height ** 2)
         
@@ -155,11 +148,6 @@ class UserManager:
         water_intake: Optional[float] = None,
         resting_bpm: Optional[float] = None,
     ) -> bool:
-        """更新用户信息
-        
-        Returns:
-            是否成功更新（如果用户不存在返回 False）
-        """
         if not self.get_user(user_id):
             return False
         
@@ -219,15 +207,6 @@ class UserManager:
         return True
 
     def delete_user(self, user_id: int, cascade: bool = False) -> bool:
-        """删除用户
-        
-        Args:
-            user_id: 要删除的用户 ID
-            cascade: 是否级联删除关联数据（workouts, nutrition, workout_analysis）
-        
-        Returns:
-            是否成功删除（如果用户不存在返回 False）
-        """
         try:
             with self.db.conn:
                 if cascade:
@@ -239,19 +218,17 @@ class UserManager:
                 deleted = cur.rowcount if cur else 0
                 return deleted > 0
         except Exception as e:
-            print(f"删除用户时出错: {e}")
+            print(f"Error deleting user: {e}")  
             self.db.conn.rollback()
             return False
 
     def get_user_statistics(self, user_id: int) -> Optional[Dict]:
-        """获取用户的统计信息（包括关联的训练、营养数据）"""
         user = self.get_user(user_id)
         if not user:
             return None
         
         stats = {"user_info": user}
         
-        # 训练统计
         workout_stats = self.db.execute(
             """
             SELECT 
@@ -266,7 +243,6 @@ class UserManager:
         )
         stats["workout_stats"] = dict(workout_stats) if workout_stats else {}
         
-        # 营养统计
         nutrition_stats = self.db.execute(
             """
             SELECT 
@@ -282,7 +258,6 @@ class UserManager:
         )
         stats["nutrition_stats"] = dict(nutrition_stats) if nutrition_stats else {}
         
-        # 分析统计
         analysis_stats = self.db.execute(
             """
             SELECT 
@@ -300,6 +275,5 @@ class UserManager:
         return stats
 
     def count_users(self) -> int:
-        """返回用户总数"""
         row = self.db.execute("SELECT COUNT(*) AS count FROM users", fetchone=True)
         return row["count"] if row else 0

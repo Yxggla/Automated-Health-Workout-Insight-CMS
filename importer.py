@@ -10,8 +10,8 @@ class DataImporter:
     """Import and normalize the Kaggle CSV into the SQLite schema."""
 
     COLUMN_MAP: Dict[str, str] = {
-        "user_id": "user_id",  # 如果CSV中有user_id列，将使用它
-        "User_ID": "user_id",  # 支持不同大小写
+        "user_id": "user_id",
+        "User_ID": "user_id",
         "User ID": "user_id",
         "UserID": "user_id",
         "Age": "age",
@@ -76,7 +76,6 @@ class DataImporter:
         df = pd.read_csv(csv_path)
         df = df.rename(columns=self.COLUMN_MAP)
 
-        # 处理数值列
         numeric_columns = [
             "user_id", "age", "height", "weight", "bmi", "session_duration", "calories_burned",
             "max_bpm", "avg_bpm", "resting_bpm", "carbs", "proteins", "fats",
@@ -92,7 +91,6 @@ class DataImporter:
             else:
                 df[numeric_col] = pd.NA
 
-        # 处理文本列
         text_columns = [
             "gender", "workout_type", "experience_level", "name_of_exercise", 
             "benefit", "target_muscle_group", "equipment_needed", "difficulty_level",
@@ -105,16 +103,13 @@ class DataImporter:
             else:
                 df[text_col] = df[text_col].fillna("").astype(str)
 
-        # 确保所有必需字段都存在
         for field in self.REQUIRED_FIELDS:
             if field not in df.columns:
                 df[field] = pd.NA
 
         df = df.fillna(pd.NA)
 
-        # 清空现有数据
         if clear_existing:
-            # 同步清空复数表，避免旧数据残留
             self.db.truncate_tables(["users", "workouts", "nutrition", "workout_analysis", "derived_metrics"])
 
         users_rows = []
@@ -124,13 +119,11 @@ class DataImporter:
         metrics_rows = []
 
         for idx, row in df.iterrows():
-            # 优先使用CSV中的user_id，如果没有则使用行号
             if "user_id" in df.columns and pd.notna(row.get("user_id")):
                 user_id = int(row["user_id"])
             else:
-                user_id = idx + 1  # 如果没有user_id列，使用行号作为默认ID
+                user_id = idx + 1
             
-            # users 表数据
             users_rows.append(
                 (
                     user_id,
@@ -147,7 +140,6 @@ class DataImporter:
                     row.get("resting_bpm"),
                 )
             )
-            # workouts 表数据
             workout_rows.append(
                 (
                     user_id,
@@ -167,7 +159,6 @@ class DataImporter:
                 )
             )
             
-            # nutrition 表数据
             nutrition_rows.append(
                 (
                     user_id,
@@ -190,7 +181,6 @@ class DataImporter:
                 )
             )
             
-            # workout_analysis 表数据
             analysis_rows.append(
                 (
                     user_id,
@@ -206,7 +196,6 @@ class DataImporter:
                     (100 - (row.get("resting_bpm", 70) - 60)) / 40 * 100 if pd.notna(row.get("resting_bpm")) else None,
                 )
             )
-            # derived_metrics 表数据
             metrics_rows.append(
                 (
                     user_id,
